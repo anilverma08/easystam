@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EA SYSTAM</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script type="text/javascript">
+       (function(){
+          emailjs.init("7eHdpbhA5aCLwFFaY"); 
+       })();
+    </script>
+</head>
+<body>
+
+    <!-- 1. ADMIN LOGIN SCREEN -->
+    <div id="login-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; width: 100%;">
+        <form id="login-form" onsubmit="return false;" style="background: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px;">
+            <h2 style="text-align: center; margin-bottom: 20px; color: #1e1b4b;">Admin Login</h2>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: 600; color: #475569;">Registered Email</label>
+                <input type="email" id="login-email" placeholder="e.g. anil@example.com" required style="width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: 600; color: #475569;">Enter Password</label>
+                <input type="password" id="login-password" placeholder="••••••••" required style="width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
+            </div>
+
+            <button type="button" id="send-otp-btn" onclick="requestLoginOTP()" style="width: 100%; padding: 12px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.3s;">
+                <i class="fa-solid fa-paper-plane"></i> Send OTP
+            </button>
+
+            <div id="otp-entry-section" style="display: none; margin-top: 20px; border-top: 2px dashed #e2e8f0; padding-top: 15px;">
+                <div style="margin-bottom: 15px;">
+                    <label style="font-weight: 600; color: #475569;">Enter 6-Digit OTP</label>
+                    <input type="text" id="login-otp" placeholder="•••••" maxlength="6" style="width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center; letter-spacing: 4px; font-size: 16px; font-weight: bold;">
+                </div>
+                <button type="button" onclick="verifyLoginOTP()" style="width: 100%; padding: 12px; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                    <i class="fa-solid fa-right-to-bracket"></i> Verify & Login
+                </button>
+            </div>
+
+            <p id="auth-status-msg" style="text-align: center; margin-top: 15px; font-size: 14px; font-weight: 600; color: #4f46e5;"></p>
+
+            <p style="text-align: center; margin-top: 15px; font-size: 14px; margin-bottom: 5px;">
+                Naye Admin hain? <a href="#" onclick="toggleAuthScreens('register')">Account Banayein</a>
+            </p>
+            <p style="text-align: center; font-size: 13px; margin-top: 5px;">
+                <a href="#" onclick="toggleAuthScreens('forgot')" style="color: #ef4444; font-weight: 600;">Forgot Credentials?</a>
+            </p>
+        </form>
+    </div>
+
+    <!-- 2. CREATE ADMIN (REGISTER SCREEN) -->
+    <div id="register-screen" style="display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; width: 100%;">
+        <form id="register-form" onsubmit="handleRealRegistration(event);" style="background: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px;">
+            <h2 style="text-align: center; margin-bottom: 20px; color: #1e1b4b;">Create Admin</h2>
+            
+            <div style="margin-bottom: 15px;">
+                <label>Full Name</label>
+                <input type="text" id="reg-user" placeholder="e.g. Anil Verma" required style="width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 6px;">
+            </div>
+
+            <!-- BADLAV: (For OTP Login) label se permanent clear kar diya gaya hai -->
+            <div style="margin-bottom: 15px;">
+                <label>Enter Your Email</label>
+                <input type="email" id="reg-email" placeholder="e.g. anil@example.com" required style="width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 6px;">
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label>Choose Password</label>
+                <input type="password" id="reg-pass" placeholder="••••••••" required style="width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                <small style="color: #64748b; font-size: 11px; display: block; margin-top: 2px;">Min 8 chars, 1 Letter, 1 Number & 1 Special character.</small>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <label>Confirm Password</label>
+                <input type="password" id="reg-confirm-pass" placeholder="••••••••" required style="width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 6px;">
+            </div>
+            
+            <button type="submit" style="width: 100%; padding: 12px; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                Register Account
+            </button>
+            <p style="text-align: center; margin-top: 15px; font-size: 14px;">
+                Pehle se account hai? <a href="#" onclick="toggleAuthScreens('login')">Login Karein</a>
+            </p>
+        </form>
+    </div>
+
+    <!-- 3. ACCOUNT RECOVERY (FORGOT SCREEN) -->
+    <div id="forgot-screen" style="display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; width: 100%;">
+        <form id="forgot-form" onsubmit="handleRecoverySubmit(event);" style="background: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px;">
+            <h2 style="text-align: center; margin-bottom: 20px; color: #1e1b4b;">Account Recovery</h2>
+            
+            <p id="recovery-status-msg" style="text-align: center; margin-bottom: 15px; font-size: 13px; font-weight: 600; color: #4f46e5;"></p>
+
+            <div id="recovery-step-email" style="margin-bottom: 15px;">
+                <label style="font-weight: 600; color: #475569;">Enter Registered Email</label>
+                <div style="display: flex; gap: 8px; margin-top: 5px;">
+                    <input type="email" id="forgot-email" placeholder="e.g. anil@example.com" style="flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    <button type="button" onclick="requestRecoveryOTP()" style="padding: 10px 12px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">Get OTP</button>
+                </div>
+            </div>
+
+            <div id="recovery-step-otp" style="display: none; margin-bottom: 15px;">
+                <label style="font-weight: 600; color: #475569;">Enter 6-Digit OTP</label>
+                <div style="display: flex; gap: 8px; margin-top: 5px;">
+                    <input type="text" id="forgot-otp" maxlength="6" placeholder="••••••" style="flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; text-align: center; font-weight: bold; letter-spacing: 2px;">
+                    <button type="button" onclick="verifyRecoveryOTP()" style="padding: 10px 12px; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px;">Verify</button>
+                </div>
+            </div>
+
+            <div id="recovery-step-fields" style="display: none; border-top: 2px dashed #e2e8f0; padding-top: 15px;">
+                <div style="margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                    <span style="font-size: 12px; font-weight: 700; color: #475569; display: block; margin-bottom: 2px;">Your Name:</span>
+                    <span id="recovered-username" style="font-size: 14px; font-weight: bold; color: #1e1b4b;">—</span>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="font-weight: 600; color: #475569;">Choose New Password</label>
+                    <input type="password" id="forgot-new-pass" placeholder="Enter new password" style="width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    <small style="color: #64748b; font-size: 11px; display: block; margin-top: 2px;">Min 8 chars, 1 Letter, 1 Number & 1 Special character.</small>
+                </div>
+
+                <button type="submit" style="width: 100%; padding: 12px; background: #22c55e; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                    Reset Password
+                </button>
+            </div>
+
+            <p style="text-align: center; margin-top: 15px; font-size: 14px;">
+                Wapas jana hai? <a href="#" onclick="toggleAuthScreens('login')">Back to Login</a>
+            </p>
+        </form>
+    </div>
+
+    <!-- Modals & Dashboard -->
+    <div id="absent-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999999; justify-content: center; align-items: center; padding: 15px;">
+        <div style="background: white; padding: 25px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); width: 100%; max-width: 400px;">
+            <h3 style="margin-top: 0; color: #ef4444;"><i class="fa-solid fa-circle-question"></i> Absent Ka Reason Likhein</h3>
+            <p style="color: #64748b; font-size: 13px; margin-bottom: 15px;">Chhutti ka koi reason dalna chahte hain? (Max 200 letters)</p>
+            <input type="text" id="absent-reason-input" maxlength="200" placeholder="e.g. Bimar tha / Urgent Work" style="width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 6px; margin-bottom: 20px; font-size: 14px;">
+            <div style="display: flex; gap: 10px;">
+                <button type="button" id="modal-btn-skip" style="flex: 1; padding: 10px; background: #f1f5f9; color: #475569; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">Skip / Khali Chhodein</button>
+                <button type="button" id="modal-btn-save" style="flex: 1; padding: 10px; background: #ef4444; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">Save Reason</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="history-modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 999999; justify-content: center; align-items: center; padding: 15px;">
+        <div style="background: #f8fafc; width: 100%; max-width: 950px; max-height: 85vh; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15); display: flex; flex-direction: column; overflow: hidden;">
+            <div style="padding: 20px; background: white; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; color: #1e1b4b; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-chart-pie" style="color: #4f46e5;"></i> Monthly History Summary
+                </h3>
+                <button type="button" onclick="closeHistoryModal()" style="background: #f1f5f9; border: none; color: #64748b; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div style="padding: 20px; overflow-y: auto; flex: 1;">
+                <div class="responsive-table-wrapper">
+                    <table class="history-table-master">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Present</th>
+                                <th>Absent</th>
+                                <th>Base Salary</th>
+                                <th>Total Borrowing</th>
+                                <th>Total Overtime</th>
+                                <th>Final Payable</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-list"></tbody>
+                    </table>
+                </div>
+                <div id="history-empty-message" style="display:none; text-align: center; padding: 40px 20px; color: #64748b;">
+                    <i class="fa-solid fa-folder-open" style="font-size: 40px; margin-bottom: 12px; color: #cbd5e1; display: block;"></i>
+                    Pichle mahino ka koi record maujood nahi hai.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-dashboard" style="display: none; padding: 15px;">
+        <header class="dashboard-header" style="background: #ffffff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 8 rgba(0,0,0,0.05); margin-bottom: 15px; position: relative; z-index: 100;">
+            <div class="header-top-row" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-wallet" style="color: #4f46e5; font-size: 20px;"></i>
+                    <h1 class="app-logo" style="font-size: 20px; font-weight: 700; color: #1e1b4b; margin: 0; letter-spacing: 0.5px;">EA SYSTAM</h1>
+                </div>
+                
+                <div style="display: flex; align-items: center; gap: 10px; position: relative;">
+                    <button type="button" id="menu-three-dot-btn" onclick="toggleThreeDotMenu(event)" style="background: #f1f5f9; border: none; color: #334155; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; z-index: 110;">
+                        <i class="fa-solid fa-ellipsis-vertical" style="font-size: 18px;"></i>
+                    </button>
+                    
+                    <div id="threedot-dropdown-container" style="display: none; pointer-events: none; position: absolute; top: 42px; right: 46px; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); width: 160px; z-index: 99999;">
+                        <button type="button" onclick="openHistoryModal()" style="width: 100%; text-align: left; background: none; border: none; padding: 12px 16px; font-size: 14px; font-weight: 600; color: #334155; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-clock-history" style="color: #4f46e5;"></i> History Report
+                        </button>
+                    </div>
+
+                    <button type="button" class="logout-btn" onclick="handleLogout()" style="background: #fef2f2; border: none; color: #ef4444; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; z-index: 110;">
+                        <i class="fa-solid fa-power-off" style="font-size: 16px;"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="header-status-row" style="margin-top: 8px; display: flex; align-items: center;">
+                <span class="status-badge" style="background: #dcfce7; color: #166534; font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-cloud"></i> Cloud Connected
+                </span>
+            </div>
+            <div id="mobile-admin-bar" style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed #e5e7eb; width: 100%;">
+                <span id="welcome-user" style="font-size: 13px; font-weight: 600; color: #4b5563; display: flex; align-items: center; gap: 6px;"></span>
+            </div>
+        </header>
+
+        <h2 id="kpi-main-heading" style="color: #1e1b4b; font-size: 18px; font-weight: 700; margin: 20px 0 10px 5px; display: flex; align-items: center; gap: 8px;"></h2>
+
+        <div class="kpi-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; position: relative; z-index: 10;">
+            <div class="kpi-card" style="background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
+                <span style="color: #10b981; font-size: 18px;"><i class="fa-solid fa-calendar-check"></i></span>
+                <p style="margin: 5px 0 0 0; color: #6b7280; font-size: 14px;">Total Present</p>
+                <h3 id="kpi-present" style="margin: 5px 0 0 0; font-size: 20px; color: #1f2937;">0 Din</h3>
+            </div>
+            <div class="kpi-card" style="background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
+                <span style="color: #ef4444; font-size: 18px;"><i class="fa-solid fa-calendar-xmark"></i></span>
+                <p style="margin: 5px 0 0 0; color: #6b7280; font-size: 14px;">Total Absent</p>
+                <h3 id="kpi-absent" style="margin: 5px 0 0 0; font-size: 20px; color: #1f2937;">0 Din</h3>
+            </div>
+            <div class="kpi-card" style="background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
+                <span style="color: #f59e0b; font-size: 18px;"><i class="fa-solid fa-hand-holding-dollar"></i></span>
+                <p style="margin: 5px 0 0 0; color: #6b7280; font-size: 14px;">Total Borrowing</p>
+                <h3 id="kpi-borrow" style="margin: 5px 0 0 0; font-size: 20px; color: #1f2937;">₹0</h3>
+            </div>
+            <div class="kpi-card" style="background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
+                <span style="color: #6366f1; font-size: 18px;"><i class="fa-solid fa-credit-card"></i></span>
+                <p style="margin: 5px 0 0 0; color: #6b7280; font-size: 14px;">Actual Hisab (Payable)</p>
+                <h3 id="kpi-payable" style="margin: 5px 0 0 0; font-size: 20px; color: #1f2937; margin-bottom: 2px;">₹0</h3>
+                <span id="kpi-sub-base-salary" style="font-size: 12px; color: #64748b; font-weight: 600; display: block;">Base Salary: ₹0</span>
+            </div>
+        </div>
+
+        <div class="form-section" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); margin-bottom: 25px; position: relative; z-index: 50;">
+            <h3 style="margin-top: 0; color: #1e1b4b;"><i class="fa-solid fa-pen-to-square"></i> Attendance Entry</h3>
+            <form id="ledger-form" onsubmit="event.preventDefault();">
+                <input type="hidden" id="edit-index">
+                <div style="margin-bottom: 15px;">
+                    <label>Select Date</label>
+                    <input type="date" id="input-date" max="9999-12-31" style="width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                </div>
+                <div style="margin-bottom: 15px;">
+                    <label>Monthly Base Salary (₹)</label>
+                    <input type="number" id="input-salary" placeholder="e.g. 15000" style="width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; align-items: flex-end !important;">
+                    <div style="display: flex; flex-direction: column;">
+                        <label style="margin-bottom: 0;">Borrowing / Advance (₹)</label>
+                        <input type="number" id="input-borrowing" value="0" style="width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    </div>
+                    <div style="display: flex; flex-direction: column;">
+                        <label style="margin-bottom: 0;">Overtime Extra (₹)</label>
+                        <input type="number" id="input-overtime" value="0" style="width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 6px;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; position: relative; z-index: 60;">
+                    <button type="button" id="btn-present" style="padding: 12px; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; display: block;"><i class="fa-solid fa-circle-check"></i> Present</button>
+                    <button type="button" id="btn-absent" style="padding: 12px; background: #ef4444; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; display: block;"><i class="fa-solid fa-circle-xmark"></i> Absent</button>
+                    <button type="button" id="btn-halfday" style="padding: 12px; background: #3b82f6; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; display: block;"><i class="fa-solid fa-circle-half-stroke"></i> Half Day</button>
+                    <button type="button" id="btn-leave" style="padding: 12px; background: #64748b; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; display: block;"><i class="fa-solid fa-mug-hot"></i> Paid Leave</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="table-section" style="margin-bottom: 25px; position: relative; z-index: 10;">
+            <h3>Live Ledger Days</h3>
+            <div class="responsive-table-wrapper">
+                <table class="ledger-table-master" id="live-ledger-table-id"></table>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js?v=20.0"></script>
+</body>
+</html>
