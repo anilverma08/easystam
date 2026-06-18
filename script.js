@@ -88,6 +88,7 @@ function validatePasswordStrength(password) {
     return (password.length >= minLength && hasLetter && hasNumber && hasSpecial);
 }
 
+// Live EmailJS Real OTP Function - STRICT ISOLATION MODE FIXED
 window.requestLoginOTP = function() {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const password = document.getElementById('login-password').value.trim();
@@ -113,33 +114,50 @@ window.requestLoginOTP = function() {
     .then(response => response.json())
     .then(data => {
         let isLocalFallback = (email === 'anil@example.com' || email === localStorage.getItem('last_registered_email'));
-        let isPasswordCorrect = (data && String(data.password) === String(password)) || (isLocalFallback && password);
-
-        if ((data !== null || isLocalFallback) && isPasswordCorrect) {
-            const realOTP = Math.floor(100000 + Math.random() * 900000);
-            localOTPSession.generatedOTP = String(realOTP);
-            localOTPSession.targetEmail = email;
-
-            emailjs.send("service_f7w012p", "template_mpcvwoa", {
-                to_email: email,
-                otp_code: realOTP
-            })
-            .then(() => {
-                statusMsg.style.color = "#10b981";
-                statusMsg.innerText = "Password Correct! Security verification OTP has been sent successfully!";
-                document.getElementById('otp-entry-section').style.display = 'block';
-            })
-            .catch(err => {
-                statusMsg.style.color = "#ef4444";
-                statusMsg.innerText = "Email delivery failed! Please check connection.";
-                console.error("EmailJS Error:", err);
-            });
-
-        } else {
+        
+        // Step 1: Check validation for email registration existence strictly
+        if (data === null && !isLocalFallback) {
             statusMsg.style.color = "#ef4444";
-            statusMsg.innerText = "Access Denied: Invalid Registered Email or Password!";
+            statusMsg.innerText = "Access Denied: This email is not registered anywhere!";
             document.getElementById('otp-entry-section').style.display = 'none';
+            return;
         }
+
+        // Step 2: Extract absolute dynamic password token parameters
+        let realSavedPassword = null;
+        if (data && data.password) {
+            realSavedPassword = data.password;
+        } else if (isLocalFallback) {
+            realSavedPassword = localStorage.getItem('registered_pass_backup_' + safeEmailKey);
+        }
+
+        // Step 3: Strict comparison matching lock block
+        if (!realSavedPassword || String(realSavedPassword) !== String(password)) {
+            statusMsg.style.color = "#ef4444";
+            statusMsg.innerText = "Access Denied: Incorrect Password! OTP block locked.";
+            document.getElementById('otp-entry-section').style.display = 'none';
+            return;
+        }
+
+        // Step 4: Final safe parameter execution pass triggers
+        const realOTP = Math.floor(100000 + Math.random() * 900000);
+        localOTPSession.generatedOTP = String(realOTP);
+        localOTPSession.targetEmail = email;
+
+        emailjs.send("service_f7w012p", "template_mpcvwoa", {
+            to_email: email,
+            otp_code: realOTP
+        })
+        .then(() => {
+            statusMsg.style.color = "#10b981";
+            statusMsg.innerText = "Password Correct! Verification OTP has been sent successfully!";
+            document.getElementById('otp-entry-section').style.display = 'block';
+        })
+        .catch(err => {
+            statusMsg.style.color = "#ef4444";
+            statusMsg.innerText = "Email delivery failed! Please check connection.";
+            console.error("EmailJS Error:", err);
+        });
     })
     .catch(err => {
         statusMsg.style.color = "#ef4444";
@@ -165,6 +183,7 @@ window.verifyLoginOTP = function() {
     }
 };
 
+// LIVE CLOUD REGISTRATION
 window.handleRealRegistration = function(event) {
     event.preventDefault();
     const username = document.getElementById('reg-user').value.trim();
@@ -181,10 +200,11 @@ window.handleRealRegistration = function(event) {
 
     if(password !== confirmPassword) { alert("Choose Password aur Confirm Password match nahi ho rahe hain!"); return; }
     
-    localStorage.setItem('last_registered_email', email);
-    localStorage.setItem('registered_name_' + email.replace(/[^a-zA-Z0-9]/g, "_"), username);
-    
     const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
+    localStorage.setItem('last_registered_email', email);
+    localStorage.setItem('registered_name_' + safeEmailKey, username);
+    localStorage.setItem('registered_pass_backup_' + safeEmailKey, password);
+    
     fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`, { 
         method: 'PUT', 
         body: JSON.stringify({ 
@@ -200,12 +220,12 @@ window.handleRealRegistration = function(event) {
         const statusMsg = document.getElementById('auth-status-msg');
         if (statusMsg) {
             statusMsg.style.color = "#10b981";
-            // BADLAV: Text message se custom token "OTP login" clear ho gya hai
             statusMsg.innerText = "Account Registered! Apne password se login karke verification code request karein.";
         }
     });
 };
 
+// RECOVERY OTP REQUEST
 window.requestRecoveryOTP = function() {
     const email = document.getElementById('forgot-email').value.trim().toLowerCase();
     const statusMsg = document.getElementById('recovery-status-msg');
@@ -284,6 +304,7 @@ window.handleRecoverySubmit = function(event) {
     }
 
     const safeKey = email.replace(/[^a-zA-Z0-9]/g, "_");
+    localStorage.setItem('registered_pass_backup_' + safeKey, newPass);
     
     fetch(`${FIREBASE_DB_URL}records/${safeKey}/init.json`, {
         method: 'PATCH',
@@ -358,7 +379,6 @@ function toggleThreeDotMenu(event) {
     }
 }
 
-// History & remaining structures consistent layout passes
 function openHistoryModal() {
     if (dropdownContainer) { dropdownContainer.style.display = 'none'; dropdownContainer.style.pointerEvents = 'none'; }
     if (historyOverlay) historyOverlay.style.display = 'flex';
