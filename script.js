@@ -60,7 +60,6 @@ const mainDashboard = document.getElementById('main-dashboard');
 const welcomeUserText = document.getElementById('welcome-user');
 const dropdownContainer = document.getElementById('threedot-dropdown-container');
 const historyOverlay = document.getElementById('history-modal-overlay');
-const historyEmptyMessage = document.getElementById('history-empty-message');
 const historyList = document.getElementById('history-list');
 
 const dateInput = document.getElementById('input-date');
@@ -97,7 +96,77 @@ function validatePasswordStrength(password) {
     return (password.length >= minLength && hasLetter && hasNumber && hasSpecial);
 }
 
-// SECURE LOGIN WITH MASTER LOCK AND DYNAMIC SLOT 2 SHIFT
+// Automatically checks device trust status dynamically
+window.checkDeviceTrustStatus = function() {
+    const email = document.getElementById('login-email').value.trim().toLowerCase();
+    const sendOtpBtn = document.getElementById('send-otp-btn');
+    const directLoginBtn = document.getElementById('direct-login-btn');
+    const otpSection = document.getElementById('otp-entry-section');
+
+    if (!email) {
+        if (sendOtpBtn) sendOtpBtn.style.setProperty('display', 'block', 'important');
+        if (directLoginBtn) directLoginBtn.style.setProperty('display', 'none', 'important');
+        return;
+    }
+
+    const safeKey = email.replace(/[^a-zA-Z0-9]/g, "_");
+    const isTrusted = localStorage.getItem('trusted_device_' + safeKey);
+
+    if (isTrusted === 'true') {
+        if (sendOtpBtn) sendOtpBtn.style.setProperty('display', 'none', 'important');
+        if (directLoginBtn) directLoginBtn.style.setProperty('display', 'block', 'important');
+        if (otpSection) otpSection.style.setProperty('display', 'none', 'important');
+    } else {
+        if (sendOtpBtn) sendOtpBtn.style.setProperty('display', 'block', 'important');
+        if (directLoginBtn) directLoginBtn.style.setProperty('display', 'none', 'important');
+    }
+};
+
+// DIRECT SECURE PASSWORD LOGIN (FOR TRUSTED/REMEMBERED DEVICES)
+window.handleDirectDeviceLogin = function() {
+    const email = document.getElementById('login-email').value.trim().toLowerCase();
+    const password = document.getElementById('login-password').value.trim();
+    const statusMsg = document.getElementById('auth-status-msg');
+
+    if (!email || !password) { alert("Email aur Password dono daalein!"); return; }
+
+    statusMsg.style.color = "#f59e0b";
+    statusMsg.innerText = "Authenticating trusted session...";
+
+    const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
+    const currentDeviceCode = getDeviceFingerprint();
+
+    fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`)
+    .then(res => res.json())
+    .then(data => {
+        if (data === null || String(data.password) !== String(password)) {
+            statusMsg.style.color = "#ef4444";
+            statusMsg.innerText = "Access Denied: Incorrect Password!";
+            return;
+        }
+
+        let currentDevices = Array.isArray(data.devices) ? data.devices.filter(Boolean) : [];
+
+        if (!currentDevices.includes(currentDeviceCode)) {
+            statusMsg.style.color = "#ef4444";
+            statusMsg.innerText = "Security Sync Alert! Please reverify via OTP.";
+            localStorage.removeItem('trusted_device_' + safeEmailKey);
+            window.checkDeviceTrustStatus();
+            return;
+        }
+
+        localStorage.setItem('active_session_username', email);
+        statusMsg.style.color = "#10b981";
+        statusMsg.innerText = "Welcome back!";
+        forceOpenDashboard();
+    })
+    .catch(() => {
+        statusMsg.style.color = "#ef4444";
+        statusMsg.innerText = "Database connection failed.";
+    });
+};
+
+// ORIGINAL OTP REQUEST FOR NEW/UNVERIFIED DEVICES
 window.requestLoginOTP = function() {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const password = document.getElementById('login-password').value.trim();
@@ -105,16 +174,8 @@ window.requestLoginOTP = function() {
     
     if (!email || !password) { alert("Email aur Password dono bharna zaroori hai."); return; }
 
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailPattern.test(email)) { 
-        statusMsg.style.color = "#ef4444";
-        statusMsg.innerText = "Error: Kripya ek sahi aur valid Email address daalein!";
-        document.getElementById('otp-entry-section').style.display = 'none';
-        return; 
-    }
-
     statusMsg.style.color = "#f59e0b";
-    statusMsg.innerText = "Verifying credentials and managing secure slots...";
+    statusMsg.innerText = "Verifying credentials and structural hardware...";
 
     const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
     const currentDeviceCode = getDeviceFingerprint();
@@ -122,17 +183,9 @@ window.requestLoginOTP = function() {
     fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`)
     .then(response => response.json())
     .then(data => {
-        if (data === null) {
+        if (data === null || String(data.password) !== String(password)) {
             statusMsg.style.color = "#ef4444";
-            statusMsg.innerText = "Access Denied: This email is not registered!";
-            document.getElementById('otp-entry-section').style.display = 'none';
-            return;
-        }
-
-        if (String(data.password) !== String(password)) {
-            statusMsg.style.color = "#ef4444";
-            statusMsg.innerText = "Access Denied: Incorrect Password!";
-            document.getElementById('otp-entry-section').style.display = 'none';
+            statusMsg.innerText = "Access Denied: Invalid Credentials!";
             return;
         }
 
@@ -140,7 +193,7 @@ window.requestLoginOTP = function() {
 
         if (!currentDevices.includes(currentDeviceCode)) {
             if (currentDevices.length >= 2) {
-                currentDevices[1] = currentDeviceCode;
+                currentDevices[1] = currentDeviceCode; 
             } else {
                 currentDevices.push(currentDeviceCode);
             }
@@ -161,17 +214,14 @@ window.requestLoginOTP = function() {
         })
         .then(() => {
             statusMsg.style.color = "#10b981";
-            statusMsg.innerText = "Credentials verified! OTP sent successfully.";
-            document.getElementById('otp-entry-section').style.display = 'block';
+            statusMsg.innerText = "OTP sent successfully to your email!";
+            document.getElementById('send-otp-btn').style.setProperty('display', 'none', 'important');
+            document.getElementById('otp-entry-section').style.setProperty('display', 'block', 'important');
         })
         .catch(() => {
             statusMsg.style.color = "#ef4444";
             statusMsg.innerText = "Email delivery failed.";
         });
-    })
-    .catch(() => {
-        statusMsg.style.color = "#ef4444";
-        statusMsg.innerText = "Error: Database connection failed.";
     });
 };
 
@@ -190,6 +240,7 @@ window.verifyLoginOTP = function() {
         })
         .then(() => {
             localStorage.setItem('active_session_username', email);
+            localStorage.setItem('trusted_device_' + safeEmailKey, 'true'); 
             statusMsg.style.color = "#10b981";
             statusMsg.innerText = "Login successful!";
             forceOpenDashboard();
@@ -200,7 +251,6 @@ window.verifyLoginOTP = function() {
     }
 };
 
-// LIVE CLOUD REGISTRATION WITH DYNAMIC GREEN TEXT STATUS
 window.handleRealRegistration = function(event) {
     event.preventDefault();
     const username = document.getElementById('reg-user').value.trim();
@@ -209,12 +259,6 @@ window.handleRealRegistration = function(event) {
     const confirmPassword = document.getElementById('reg-confirm-pass').value.trim();
     
     if(!username || !email || !password || !confirmPassword) { alert("Saari details dalna zaroori hai!"); return; }
-    
-    if(!validatePasswordStrength(password)) {
-        alert("⚠️ Password Strong Nahi Hai:\n\nKam se kam 8 letters lambha hona chahiye, aur usme ek Number (0-9), ek Alphabet Letter (a-z) aur ek Special character (!@#$%) hona jaroori hai!");
-        return;
-    }
-    
     if(password !== confirmPassword) { alert("Passwords match nahi ho rahe!"); return; }
     
     const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
@@ -224,7 +268,7 @@ window.handleRealRegistration = function(event) {
     .then(res => res.json())
     .then(existingData => {
         if (existingData !== null) {
-            alert("⚠️ Account Already Exists: Yeh Email ID pehle se registered hai!");
+            alert("⚠️ Account Already Exists!");
             return;
         }
 
@@ -240,7 +284,7 @@ window.handleRealRegistration = function(event) {
         })
         .then(() => {
             toggleAuthScreens('login');
-            // Pop-up alert ko hatakar niche status text green kar diya gaya hai
+            localStorage.setItem('trusted_device_' + safeEmailKey, 'true'); 
             const statusMsg = document.getElementById('auth-status-msg');
             if (statusMsg) {
                 statusMsg.style.color = "#10b981";
@@ -250,122 +294,15 @@ window.handleRealRegistration = function(event) {
     });
 };
 
-// RECOVERY OTP REQUEST
-window.requestRecoveryOTP = function() {
-    const email = document.getElementById('forgot-email').value.trim().toLowerCase();
-    const statusMsg = document.getElementById('recovery-status-msg');
-    
-    if (!email) { alert("Kripya pehle apni Registered Email daalein!"); return; }
-
-    statusMsg.style.color = "#f59e0b";
-    statusMsg.innerText = "Checking email registration...";
-
-    const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
-
-    fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`)
-    .then(res => res.json())
-    .then(cloudData => {
-        if (cloudData !== null) {
-            const recoveryOTP = Math.floor(100000 + Math.random() * 900000);
-            recoveryOTPSession.generatedOTP = String(recoveryOTP);
-            recoveryOTPSession.targetEmail = email;
-            recoveryOTPSession.databaseUsername = cloudData.name ? cloudData.name : email.split('@')[0];
-
-            emailjs.send("service_f7w012p", "template_mpcvwoa", {
-                to_email: email,
-                otp_code: recoveryOTP
-            })
-            .then(() => {
-                statusMsg.style.color = "#10b981";
-                statusMsg.innerText = "OTP sent to your recovery email address!";
-                document.getElementById('recovery-step-otp').style.display = 'block';
-            })
-            .catch(() => {
-                statusMsg.style.color = "#ef4444";
-                statusMsg.innerText = "Failed to send recovery OTP.";
-            });
-        } else {
-            statusMsg.style.color = "#ef4444";
-            statusMsg.innerText = "This email is not registered anywhere!";
-        }
-    });
-};
-
-window.verifyRecoveryOTP = function() {
-    const inputOtp = document.getElementById('forgot-otp').value.trim();
-    const statusMsg = document.getElementById('recovery-status-msg');
-
-    if (!inputOtp) { alert("Kripya OTP enter karein."); return; }
-
-    if (inputOtp === recoveryOTPSession.generatedOTP) {
-        statusMsg.style.color = "#10b981";
-        statusMsg.innerText = "OTP Verified! Now choose a strong new password.";
-        document.getElementById('recovered-username').innerText = recoveryOTPSession.databaseUsername.toUpperCase();
-        document.getElementById('recovery-step-fields').style.display = 'block';
-    } else {
-        statusMsg.style.color = "#ef4444";
-        statusMsg.innerText = "Incorrect OTP code.";
-    }
-};
-
-window.handleRecoverySubmit = function(event) {
-    event.preventDefault();
-    const email = recoveryOTPSession.targetEmail;
-    const newPass = document.getElementById('forgot-new-pass').value.trim();
-    const statusMsg = document.getElementById('recovery-status-msg');
-
-    if (!newPass) { alert("New Password bharna mandatory hai!"); return; }
-
-    if(!validatePasswordStrength(newPass)) {
-        alert("⚠️ Password Strong Nahi Hai:\n\nKam se kam 8 letters lambha hona chahiye, aur usme ek Number (0-9), ek Alphabet Letter (a-z) aur ek Special character (!@#$%) hona jaroori hai!");
-        return;
-    }
-
-    const safeKey = email.replace(/[^a-zA-Z0-9]/g, "_");
-    
-    fetch(`${FIREBASE_DB_URL}records/${safeKey}/init.json`, {
-        method: 'PATCH',
-        body: JSON.stringify({ password: newPass, registered: true })
-    })
-    .then(() => {
-        toggleAuthScreens('login');
-        alert("🔐 Success: Aapka Admin password successfully reset ho gaya hai!");
-    })
-    .catch(() => {
-        statusMsg.style.color = "#ef4444";
-        statusMsg.innerText = "Error: Database update failed.";
-    });
-};
-
-// LOGOUT WITH DYNAMIC DEVICE CLEANUP
 function handleLogout() {
     if(confirm("Logout karein?")) {
-        const email = localStorage.getItem('active_session_username');
-        if (email) {
-            const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
-            const currentDeviceCode = getDeviceFingerprint();
-
-            fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init/devices.json`)
-            .then(res => res.json())
-            .then(devices => {
-                if (Array.isArray(devices)) {
-                    let updatedDevices = devices.filter((d, index) => d !== currentDeviceCode || index === 0);
-                    fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init/devices.json`, {
-                        method: 'PUT',
-                        body: JSON.stringify(updatedDevices)
-                    }).then(() => { completeLogoutAction(); });
-                } else { completeLogoutAction(); }
-            }).catch(() => { completeLogoutAction(); });
-        } else { completeLogoutAction(); }
+        localStorage.removeItem('active_session_username'); 
+        records = []; 
+        document.body.classList.add('logged-out-state');
+        if (mainDashboard) mainDashboard.style.setProperty('display', 'none', 'important');
+        if (loginScreen) loginScreen.style.setProperty('display', 'flex', 'important');
+        toggleAuthScreens('login');
     }
-}
-
-function completeLogoutAction() {
-    localStorage.removeItem('active_session_username'); 
-    records = []; 
-    document.body.classList.add('logged-out-state');
-    if (mainDashboard) mainDashboard.style.setProperty('display', 'none', 'important');
-    if (loginScreen) loginScreen.style.setProperty('display', 'flex', 'important');
 }
 
 function forceOpenDashboard() {
@@ -378,9 +315,7 @@ function forceOpenDashboard() {
     let rawUserEmail = localStorage.getItem('active_session_username') || 'admin';
     currentAdminUsername = rawUserEmail.replace(/[^a-zA-Z0-9]/g, "_");
     
-    let finalDisplayName = localStorage.getItem('registered_name_' + currentAdminUsername);
-    if (!finalDisplayName) { finalDisplayName = rawUserEmail.split('@')[0]; }
-    if (welcomeUserText) { welcomeUserText.innerHTML = `<i class="fa-solid fa-circle-user"></i> Admin: ${finalDisplayName.toUpperCase()}`; }
+    if (welcomeUserText) { welcomeUserText.innerHTML = `<i class="fa-solid fa-circle-user"></i> Admin: ${rawUserEmail.split('@')[0].toUpperCase()}`; }
     loadOnlineData();
 }
 
@@ -388,10 +323,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if(localStorage.getItem('active_session_username')) { forceOpenDashboard(); } 
     else {
         document.body.classList.add('logged-out-state');
-        if (mainDashboard) mainDashboard.style.setProperty('display', 'none', 'important');
-        if (loginScreen) loginScreen.style.setProperty('display', 'flex', 'important');
+        toggleAuthScreens('login');
     }
-    
+    const emailField = document.getElementById('login-email');
+    if(emailField) { 
+        emailField.addEventListener('input', window.checkDeviceTrustStatus);
+        emailField.addEventListener('keyup', window.checkDeviceTrustStatus);
+        emailField.addEventListener('change', window.checkDeviceTrustStatus);
+        emailField.addEventListener('focus', window.checkDeviceTrustStatus);
+    }
+
     const btnP = document.getElementById('btn-present');
     const btnA = document.getElementById('btn-absent');
     const btnH = document.getElementById('btn-halfday');
@@ -402,7 +343,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(btnL) btnL.onclick = (e) => { e.preventDefault(); if (!checkIfAlreadyMarked(dateInput.value)) saveAttendanceStatus('Paid Leave', ''); };
     if(btnA) btnA.onclick = (e) => { e.preventDefault(); if (!checkIfAlreadyMarked(dateInput.value)) openAbsentModal(); };
 
-    if (dateInput) { dateInput.onchange = () => { render(); }; }
     if (modalBtnSkip) modalBtnSkip.onclick = () => { closeAbsentModal(); saveAttendanceStatus('Absent', ''); };
     if (modalBtnSave) modalBtnSave.onclick = () => { const rText = absentReasonInput.value.trim(); closeAbsentModal(); saveAttendanceStatus('Absent', rText); };
 });
@@ -450,15 +390,14 @@ function toggleAuthScreens(screenType) {
     if (forgotScreen) forgotScreen.style.setProperty('display', 'none', 'important');
     
     if (screenType === 'register') { registerScreen.style.setProperty('display', 'flex', 'important'); } 
-    else if (screenType === 'forgot') {
-        forgotScreen.style.setProperty('display', 'flex', 'important');
-        document.getElementById('recovery-step-otp').style.display = 'none';
-        document.getElementById('recovery-step-fields').style.display = 'none';
-        document.getElementById('recovery-status-msg').innerText = "";
-    } else {
+    else {
         loginScreen.style.setProperty('display', 'flex', 'important');
-        document.getElementById('otp-entry-section').style.display = 'none';
+        document.getElementById('otp-entry-section').style.setProperty('display', 'none', 'important');
         document.getElementById('auth-status-msg').innerText = "";
+        document.getElementById('login-email').value = "";
+        document.getElementById('login-password').value = "";
+        document.getElementById('login-otp').value = "";
+        window.checkDeviceTrustStatus();
     }
 }
 
@@ -467,36 +406,21 @@ async function loadOnlineData() {
     try {
         const response = await fetch(`${FIREBASE_DB_URL}records/${currentAdminUsername}.json`);
         const data = await response.json();
-        if(data) {
-            let parsed = Array.isArray(data) ? data.filter(Boolean) : Object.values(data);
-            records = parsed.filter(r => r && r.date);
-        } else { records = []; }
+        if(data) { records = Array.isArray(data) ? data.filter(Boolean) : Object.values(data); }
         render();
     } catch (e) { records = []; render(); }
 }
 
 async function syncAndRefresh() {
     if (!currentAdminUsername || currentAdminUsername === 'admin') return;
-    try {
-        fetch(`${FIREBASE_DB_URL}records/${currentAdminUsername}.json`, {
-            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(records.filter(i => i && i.date))
-        });
-    } catch (e) {}
+    try { fetch(`${FIREBASE_DB_URL}records/${currentAdminUsername}.json`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(records.filter(i => i && i.date)) }); } catch (e) {}
 }
 
 function saveAttendanceStatus(statusValue, reasonValue) {
-    const selectedDate = dateInput.value;
-    const salary = parseFloat(salaryInput.value) || 0;
-    const borrowing = parseFloat(borrowingInput.value) || 0;
-    const overtime = parseFloat(overtimeInput.value) || 0;
-    
-    if (!selectedDate || salary <= 0) { alert("Pehle Date aur Base Salary sahi bharein!"); return; }
-
+    const selectedDate = dateInput.value; const salary = parseFloat(salaryInput.value) || 0;
+    if (!selectedDate || salary <= 0) { alert("Sahi details bharein!"); return; }
     records = records.filter(item => item && item.date !== selectedDate);
-    records.push({ date: selectedDate, status: statusValue, salary: salary, borrowing: borrowing, overtime: overtime, reason: reasonValue });
-    if (borrowingInput) borrowingInput.value = "0";
-    if (overtimeInput) overtimeInput.value = "0";
-    if (editIndexInput) editIndexInput.value = ""; 
+    records.push({ date: selectedDate, status: statusValue, salary: salary, borrowing: parseFloat(borrowingInput.value)||0, overtime: parseFloat(overtimeInput.value)||0, reason: reasonValue });
     render(); syncAndRefresh();
 }
 
@@ -513,24 +437,16 @@ function deleteRecord(targetDate) { if (confirm("Din delete karein?")) { records
 function deleteEntireMonth(mKey) { if (confirm("Poora mahina delete karein?")) { records = records.filter(r => r && r.date && r.date.substring(0, 7) !== mKey); render(); syncAndRefresh(); } }
 
 function render() {
-    const masterTableElement = document.getElementById('live-ledger-table-id');
-    if (!masterTableElement) return;
-
+    const masterTableElement = document.getElementById('live-ledger-table-id'); if (!masterTableElement) return;
     if (historyList) historyList.innerHTML = "";
     const activeViewMonthKey = dateInput.value ? dateInput.value.substring(0, 7) : "";
-
-    const kpiMainHeading = document.getElementById('kpi-main-heading');
-    if (kpiMainHeading && activeViewMonthKey) {
-        kpiMainHeading.innerHTML = `<i class="fa-solid fa-chart-simple" style="color: #4f46e5;"></i> ${formatMonthName(activeViewMonthKey)} Ka Hisab-Kitab`;
-    }
-
+    
     let pCount = 0, aCount = 0, bSalary = 0, totalBorrow = 0, totalOvertime = 0;
     records.forEach(r => {
         if (r && r.date && r.date.substring(0, 7) === activeViewMonthKey) {
             if (r.salary > 0) bSalary = r.salary;
-            if (r.status === 'Present' || r.status === 'Paid Leave') pCount += 1.0;
-            if (r.status === 'Half Day') pCount += 0.5;   
-            if (r.status === 'Absent') aCount += 1.0;
+            if (r.status === 'Present' || r.status === 'Paid Leave') pCount += 1;
+            if (r.status === 'Half Day') pCount += 0.5; if (r.status === 'Absent') aCount += 1;
             totalBorrow += parseFloat(r.borrowing) || 0;
             totalOvertime += parseFloat(r.overtime) || 0;
         }
@@ -548,91 +464,43 @@ function render() {
     if (document.getElementById('kpi-sub-base-salary')) {
         document.getElementById('kpi-sub-base-salary').innerText = `Base Salary: ₹${bSalary} | Overtime: +₹${totalOvertime}`;
     }
-
-    const allSortedRecords = [...records].filter(item => item && item.date && item.date.substring(0, 7) === activeViewMonthKey).sort((a,b) => b.date.localeCompare(a.date));
-    const hasAnyAbsentReason = allSortedRecords.some(item => item.status === 'Absent' && item.reason);
-
-    let tableHeaderHtml = `<thead><tr><th>Date</th><th>Status</th>${hasAnyAbsentReason ? `<th>Reason</th>` : ''}<th>Borrowing</th><th>Overtime</th><th>Action</th></tr></thead>`;
-    let tableBodyHtml = '<tbody>';
-
-    allSortedRecords.forEach(item => {
+    
+    let tableHeaderHtml = `<thead><tr><th>Date</th><th>Status</th><th>Borrowing</th><th>Overtime</th><th>Action</th></tr></thead><tbody>`;
+    records.filter(item => item && item.date && item.date.substring(0, 7) === activeViewMonthKey).forEach(item => {
         let badgeClass = item.status === 'Absent' ? 'badge-absent' : (item.status === 'Half Day' ? 'badge-halfday' : (item.status === 'Paid Leave' ? 'badge-leave' : 'badge-present'));
-        
-        let reasonTdHtml = '';
-        if (item.reason && item.reason.trim() !== "" && item.reason !== "—") {
-            reasonTdHtml = `
-                <td class="reason-td-laptop-fixed">
-                    <span class="mobile-label">Reason:</span>
-                    <span class="row-data" style="font-size: 13px; color: #475569; font-style: italic; font-weight: 500;">${item.reason}</span>
-                </td>
-            `;
-        } else if (hasAnyAbsentReason && window.innerWidth > 768) {
-            reasonTdHtml = `<td><span class="mobile-label">Reason:</span><span class="row-data">—</span></td>`;
-        }
-
-        tableBodyHtml += `
-            <tr class="ledger-row-card">
+        tableHeaderHtml += `
+            <tr>
                 <td><span class="mobile-label">Date:</span><span class="row-data">${formatDateHTML(item.date)}</span></td>
                 <td><span class="mobile-label">Status:</span><span class="row-data"><span class="badge ${badgeClass}">${item.status}</span></span></td>
-                ${reasonTdHtml}
                 <td><span class="mobile-label">Borrowing:</span><span class="row-data">₹${item.borrowing || 0}</span></td>
                 <td><span class="mobile-label">Overtime:</span><span class="row-data">₹${item.overtime || 0}</span></td>
                 <td><span class="mobile-label">Action:</span><span class="row-data">
                     <button type="button" onclick="editRecord('${item.date}')" style="margin-right:8px; background:none; border:none; color:#4f46e5; cursor:pointer;"><i class="fa-solid fa-pen-to-square"></i></button>
                     <button type="button" onclick="deleteRecord('${item.date}')" style="color:#ef4444; background:none; border:none; cursor:pointer;"><i class="fa-solid fa-trash-can"></i></button>
                 </span></td>
-            </tr>
-        `;
+            </tr>`;
     });
-    masterTableElement.innerHTML = tableHeaderHtml + tableBodyHtml;
+    masterTableElement.innerHTML = tableHeaderHtml + `</tbody>`;
 
     const monthlyGroups = {};
-    records.forEach(r => { 
-        if(r && r.date) { 
-            const mKey = r.date.substring(0, 7); 
-            if (!monthlyGroups[mKey]) monthlyGroups[mKey] = []; 
-            monthlyGroups[mKey].push(r); 
-        } 
-    });
-
-    let hasHistory = false;
+    records.forEach(r => { if(r && r.date) { const mKey = r.date.substring(0, 7); if (!monthlyGroups[mKey]) monthlyGroups[mKey] = []; monthlyGroups[mKey].push(r); } });
+    
     Object.keys(monthlyGroups).sort().reverse().forEach(mKey => {
-        if (mKey === activeViewMonthKey) return; 
-        hasHistory = true;
+        if (mKey === activeViewMonthKey) return;
         let p = 0, a = 0, bs = 0, tb = 0, totOt = 0;
-        
         monthlyGroups[mKey].forEach(r => {
             if (r.status === 'Present' || r.status === 'Paid Leave') p += 1.0;
-            if (r.status === 'Half Day') p += 0.5;
-            if (r.status === 'Absent') a += 1.0;
-            if (r.salary > 0) bs = r.salary;
-            tb += parseFloat(r.borrowing) || 0;
-            totOt += parseFloat(r.overtime) || 0;
+            if (r.status === 'Half Day') p += 0.5; if (r.status === 'Absent') a += 1.0;
+            if (r.salary > 0) bs = r.salary; tb += parseFloat(r.borrowing) || 0; totOt += parseFloat(r.overtime) || 0;
         });
-        
         const dCount = getDaysInMonth(parseInt(mKey.split('-')[0]), parseInt(mKey.split('-')[1]));
-        let historyDayRate = dCount > 0 ? bs / dCount : 0;
-        let finPay = Math.max(0, Math.round((p * historyDayRate) + totOt));
-
+        let finPay = Math.max(0, Math.round((p * (dCount > 0 ? bs / dCount : 0)) + totOt));
+        
         const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td><span class="mobile-label">Month:</span><span class="row-data">${formatMonthName(mKey)}</span></td>
-            <td><span class="mobile-label">Present:</span><span class="row-data">${p} Din</span></td>
-            <td><span class="mobile-label">Absent:</span><span class="row-data">${a} Din</span></td>
-            <td><span class="mobile-label">Base Salary:</span><span class="row-data">₹${bs}</span></td>
-            <td><span class="mobile-label">Total Borrowing:</span><span class="row-data">₹${tb}</span></td>
-            <td><span class="mobile-label">Total Overtime:</span><span class="row-data">₹${totOt}</span></td>
-            <td><span class="mobile-label">Final Payable:</span><span class="row-data">₹${finPay}</span></td>
-            <td><span class="mobile-label">Action:</span><span class="row-data"><button type="button" onclick="deleteEntireMonth('${mKey}')" style="color:#ef4444; background:none; border:none; cursor:pointer;"><i class="fa-solid fa-trash-can"></i></button></span></td>
-        `;
+        tr.innerHTML = `<td>${formatMonthName(mKey)}</td><td>${p} Din</td><td>${a} Din</td><td>₹${bs}</td><td>₹${tb}</td><td>₹${totOt}</td><td>₹${finPay}</td><td><button onclick="deleteEntireMonth('${mKey}')">Delete</button></td>`;
         if (historyList) historyList.appendChild(tr);
     });
-
-    if (historyEmptyMessage) historyEmptyMessage.style.display = hasHistory ? 'none' : 'block';
-    const hTable = document.querySelector('.history-table-master');
-    if (hTable) hTable.style.setProperty('display', hasHistory ? 'table' : 'none', 'important');
 }
-
-function getDaysInMonth(y, m) { return isNaN(y) || isNaN(m) ? 30 : new Date(y, m, 0).getDate(); }
+function getDaysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
 function formatMonthName(s) { const p = s.split('-'); return new Date(p[0], p[1]-1, 1).toLocaleString('en-IN', {month:'long', year:'numeric'}); }
 function formatDateHTML(s) { const p = s.split('-'); return `${p[2]}/${p[1]}/${p[0]}`; }
