@@ -138,10 +138,8 @@ window.requestLoginOTP = function() {
 
         let currentDevices = Array.isArray(data.devices) ? data.devices.filter(Boolean) : [];
 
-        // Condition Check: Agar device pehle se list mein nahi hai
         if (!currentDevices.includes(currentDeviceCode)) {
             if (currentDevices.length >= 2) {
-                // RULE: Slot 1 (Index 0) Master safe rahega, Slot 2 (Index 1) overwrite hoga
                 currentDevices[1] = currentDeviceCode;
             } else {
                 currentDevices.push(currentDeviceCode);
@@ -153,7 +151,6 @@ window.requestLoginOTP = function() {
             localOTPSession.updatedDeviceList = currentDevices;
         }
 
-        // Generate and Send OTP
         const realOTP = Math.floor(100000 + Math.random() * 900000);
         localOTPSession.generatedOTP = String(realOTP);
         localOTPSession.targetEmail = email;
@@ -187,8 +184,6 @@ window.verifyLoginOTP = function() {
     if (!otp) { alert("Kripya OTP code enter karein."); return; }
 
     if (email === localOTPSession.targetEmail && otp === localOTPSession.generatedOTP) {
-        
-        // Save dynamic shift to Firebase immediately after OTP success
         fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init/devices.json`, {
             method: 'PUT',
             body: JSON.stringify(localOTPSession.updatedDeviceList)
@@ -205,7 +200,7 @@ window.verifyLoginOTP = function() {
     }
 };
 
-// LIVE CLOUD REGISTRATION WITH AUTOMATIC SLOT 1 (MASTER) LOCK
+// LIVE CLOUD REGISTRATION WITH DYNAMIC GREEN TEXT STATUS
 window.handleRealRegistration = function(event) {
     event.preventDefault();
     const username = document.getElementById('reg-user').value.trim();
@@ -239,13 +234,18 @@ window.handleRealRegistration = function(event) {
                 registered: true, 
                 name: username, 
                 password: password,
-                devices: [primaryDevice], // Un-removable primary master device slot
+                devices: [primaryDevice],
                 timestamp: Date.now() 
             }) 
         })
         .then(() => {
             toggleAuthScreens('login');
-            alert("✅ Registered! Yeh aapka Master Device (Slot 1) ban gaya hai aur kabhi auto-logout nahi hoga.");
+            // Pop-up alert ko hatakar niche status text green kar diya gaya hai
+            const statusMsg = document.getElementById('auth-status-msg');
+            if (statusMsg) {
+                statusMsg.style.color = "#10b981";
+                statusMsg.innerText = "Account Successfully Created!";
+            }
         });
     });
 };
@@ -349,7 +349,6 @@ function handleLogout() {
             .then(res => res.json())
             .then(devices => {
                 if (Array.isArray(devices)) {
-                    // Current dynamic hardware code clean karein, master index 0 ignore karein
                     let updatedDevices = devices.filter((d, index) => d !== currentDeviceCode || index === 0);
                     fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init/devices.json`, {
                         method: 'PUT',
@@ -416,7 +415,6 @@ function toggleThreeDotMenu(event) {
     }
 }
 
-// Global click handling to automatically collapse the three-dot dropdown
 document.addEventListener('click', () => {
     if (dropdownContainer && dropdownContainer.style.display === 'block') {
         dropdownContainer.style.display = 'none';
@@ -502,7 +500,6 @@ function saveAttendanceStatus(statusValue, reasonValue) {
     render(); syncAndRefresh();
 }
 
-// ... Baaki saare layout/render functions same hain ...
 function editRecord(targetDate) {
     const item = records.find(r => r && r.date === targetDate);
     if (item) {
