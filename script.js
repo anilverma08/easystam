@@ -400,7 +400,6 @@ function handleLogout() {
     }
 }
 
-// FIXED NAME CAPTURING AND RENDERING
 function forceOpenDashboard() {
     document.body.classList.remove('logged-out-state');
     if (loginScreen) loginScreen.style.setProperty('display', 'none', 'important');
@@ -411,7 +410,6 @@ function forceOpenDashboard() {
     let rawUserEmail = localStorage.getItem('active_session_username') || 'admin';
     currentAdminUsername = rawUserEmail.replace(/[^a-zA-Z0-9]/g, "_");
     
-    // Fallback logic to look for the structural local full name, else fetch it from cloud database dynamically
     let finalDisplayName = localStorage.getItem('registered_full_name_' + currentAdminUsername);
     
     if (finalDisplayName) {
@@ -556,6 +554,7 @@ function editRecord(targetDate) {
 function deleteRecord(targetDate) { if (confirm("Din delete karein?")) { records = records.filter(r => r && r.date !== targetDate); render(); syncAndRefresh(); } }
 function deleteEntireMonth(mKey) { if (confirm("Poora mahina delete karein?")) { records = records.filter(r => r && r.date && r.date.substring(0, 7) !== mKey); render(); syncAndRefresh(); } }
 
+// RESTORED REASON COLUMN RENDER SYSTEM
 function render() {
     const masterTableElement = document.getElementById('live-ledger-table-id'); if (!masterTableElement) return;
     if (historyList) historyList.innerHTML = "";
@@ -585,13 +584,25 @@ function render() {
         document.getElementById('kpi-sub-base-salary').innerText = `Base Salary: ₹${bSalary} | Overtime: +₹${totalOvertime}`;
     }
     
-    let tableHeaderHtml = `<thead><tr><th>Date</th><th>Status</th><th>Borrowing</th><th>Overtime</th><th>Action</th></tr></thead><tbody>`;
-    records.filter(item => item && item.date && item.date.substring(0, 7) === activeViewMonthKey).forEach(item => {
+    const allFilteredRecords = records.filter(item => item && item.date && item.date.substring(0, 7) === activeViewMonthKey);
+    const hasAnyAbsentReason = allFilteredRecords.some(item => item.status === 'Absent' && item.reason && item.reason.trim() !== "");
+
+    let tableHeaderHtml = `<thead><tr><th>Date</th><th>Status</th>${hasAnyAbsentReason ? `<th>Reason</th>` : ''}<th>Borrowing</th><th>Overtime</th><th>Action</th></tr></thead><tbody>`;
+    
+    allFilteredRecords.forEach(item => {
         let badgeClass = item.status === 'Absent' ? 'badge-absent' : (item.status === 'Half Day' ? 'badge-halfday' : (item.status === 'Paid Leave' ? 'badge-leave' : 'badge-present'));
+        
+        let reasonTdHtml = '';
+        if (hasAnyAbsentReason) {
+            let displayReason = (item.reason && item.reason.trim() !== "") ? item.reason : "—";
+            reasonTdHtml = `<td><span class="mobile-label">Reason:</span><span class="row-data" style="font-style: italic; color: #64748b;">${displayReason}</span></td>`;
+        }
+
         tableHeaderHtml += `
             <tr>
                 <td><span class="mobile-label">Date:</span><span class="row-data">${formatDateHTML(item.date)}</span></td>
                 <td><span class="mobile-label">Status:</span><span class="row-data"><span class="badge ${badgeClass}">${item.status}</span></span></td>
+                ${reasonTdHtml}
                 <td><span class="mobile-label">Borrowing:</span><span class="row-data">₹${item.borrowing || 0}</span></td>
                 <td><span class="mobile-label">Overtime:</span><span class="row-data">₹${item.overtime || 0}</span></td>
                 <td><span class="mobile-label">Action:</span><span class="row-data">
