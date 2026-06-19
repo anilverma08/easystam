@@ -88,7 +88,7 @@ function validatePasswordStrength(password) {
     return (password.length >= minLength && hasLetter && hasNumber && hasSpecial);
 }
 
-// Live EmailJS Real OTP Function - STRICT ISOLATION MODE FIXED
+// DYNAMIC CROSS-DEVICE LOGIN TRIGGER
 window.requestLoginOTP = function() {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const password = document.getElementById('login-password').value.trim();
@@ -106,32 +106,25 @@ window.requestLoginOTP = function() {
     }
 
     statusMsg.style.color = "#f59e0b";
-    statusMsg.innerText = "Verifying admin email and credentials...";
+    statusMsg.innerText = "Verifying credentials from system cloud...";
 
     const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
 
     fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`)
     .then(response => response.json())
     .then(data => {
-        let isLocalFallback = (email === 'anil@example.com' || email === localStorage.getItem('last_registered_email'));
         
-        // Step 1: Check validation for email registration existence strictly
-        if (data === null && !isLocalFallback) {
+        // Check 1: Agar database mein yeh email register hi nahi hai
+        if (data === null) {
             statusMsg.style.color = "#ef4444";
             statusMsg.innerText = "Access Denied: This email is not registered anywhere!";
             document.getElementById('otp-entry-section').style.display = 'none';
             return;
         }
 
-        // Step 2: Extract absolute dynamic password token parameters
-        let realSavedPassword = null;
-        if (data && data.password) {
-            realSavedPassword = data.password;
-        } else if (isLocalFallback) {
-            realSavedPassword = localStorage.getItem('registered_pass_backup_' + safeEmailKey);
-        }
+        let realSavedPassword = data.password;
 
-        // Step 3: Strict comparison matching lock block
+        // Check 2: Strict password matching lock block
         if (!realSavedPassword || String(realSavedPassword) !== String(password)) {
             statusMsg.style.color = "#ef4444";
             statusMsg.innerText = "Access Denied: Incorrect Password! OTP block locked.";
@@ -139,7 +132,7 @@ window.requestLoginOTP = function() {
             return;
         }
 
-        // Step 4: Final safe parameter execution pass triggers
+        // Check 3: Sab sahi hone par hi real OTP execute hoga
         const realOTP = Math.floor(100000 + Math.random() * 900000);
         localOTPSession.generatedOTP = String(realOTP);
         localOTPSession.targetEmail = email;
@@ -203,7 +196,6 @@ window.handleRealRegistration = function(event) {
     const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
     localStorage.setItem('last_registered_email', email);
     localStorage.setItem('registered_name_' + safeEmailKey, username);
-    localStorage.setItem('registered_pass_backup_' + safeEmailKey, password);
     
     fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`, { 
         method: 'PUT', 
@@ -240,13 +232,11 @@ window.requestRecoveryOTP = function() {
     fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`)
     .then(res => res.json())
     .then(cloudData => {
-        if (cloudData !== null || email === 'anil@example.com' || email === localStorage.getItem('last_registered_email')) {
+        if (cloudData !== null) {
             const recoveryOTP = Math.floor(100000 + Math.random() * 900000);
             recoveryOTPSession.generatedOTP = String(recoveryOTP);
             recoveryOTPSession.targetEmail = email;
-            
-            let fallbackName = localStorage.getItem('registered_name_' + safeEmailKey) || email.split('@')[0];
-            recoveryOTPSession.databaseUsername = (cloudData && cloudData.name) ? cloudData.name : fallbackName;
+            recoveryOTPSession.databaseUsername = cloudData.name ? cloudData.name : email.split('@')[0];
 
             emailjs.send("service_f7w012p", "template_mpcvwoa", {
                 to_email: email,
@@ -304,7 +294,6 @@ window.handleRecoverySubmit = function(event) {
     }
 
     const safeKey = email.replace(/[^a-zA-Z0-9]/g, "_");
-    localStorage.setItem('registered_pass_backup_' + safeKey, newPass);
     
     fetch(`${FIREBASE_DB_URL}records/${safeKey}/init.json`, {
         method: 'PATCH',
