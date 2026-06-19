@@ -43,6 +43,7 @@ styleFix.innerHTML = `
     @media (max-width: 768px) {
         .ledger-table-master, .ledger-table-master thead, .ledger-table-master tbody, .ledger-table-master th, .ledger-table-master td, .ledger-table-master tr,
         .history-table-master, .history-table-master thead, .history-table-master tbody, .history-table-master th, .history-table-master td, .history-table-master tr { display: block !important; }
+        .history-table-master thead { display: none !important; }
         .ledger-table-master thead, .history-table-master thead { display: none !important; }
         .ledger-table-master tr, .history-table-master tr { background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; padding: 12px !important; margin-bottom: 15px !important; box-shadow: 0 2px 5px rgba(0,0,0,0.02) !important; }
         .ledger-table-master td, .history-table-master td { display: flex !important; justify-content: space-between !important; align-items: center !important; border: none !important; border-bottom: 1px dashed #f1f5f9 !important; padding: 8px 0 !important; }
@@ -149,7 +150,7 @@ window.handleDirectDeviceLogin = function() {
 
         if (!currentDevices.includes(currentDeviceCode)) {
             statusMsg.style.color = "#ef4444";
-            statusMsg.innerText = "Security Sync Alert! Please reverify via OTP.";
+            statusMsg.innerText = "Access Blocked: Yeh device aapki approved list mein nahi hai! Same ID teesre ke phone mein nahi chal sakti.";
             localStorage.removeItem('trusted_device_' + safeEmailKey);
             window.checkDeviceTrustStatus();
             return;
@@ -471,7 +472,7 @@ function openAbsentModal() {
 
 function closeAbsentModal() { if (absentModal) absentModal.style.display = 'none'; }
 
-// FIXED: Screens switching toggle function handles forgot-screen perfectly now
+// SCREENS SWITCH LOGIC (HANDLES ALL TOGGLES PROPERLY)
 function toggleAuthScreens(screenType) {
     if (loginScreen) loginScreen.style.setProperty('display', 'none', 'important');
     if (registerScreen) registerScreen.style.setProperty('display', 'none', 'important');
@@ -592,7 +593,16 @@ function render() {
         let finPay = Math.max(0, Math.round((p * (dCount > 0 ? bs / dCount : 0)) + totOt));
         
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${formatMonthName(mKey)}</td><td>${p} Din</td><td>${a} Din</td><td>₹${bs}</td><td>₹${tb}</td><td>₹${totOt}</td><td>₹${finPay}</td><td><button onclick="deleteEntireMonth('${mKey}')">Delete</button></td>`;
+        tr.innerHTML = `
+            <td><span class="mobile-label">Month:</span><span class="row-data">${formatMonthName(mKey)}</span></td>
+            <td><span class="mobile-label">Present:</span><span class="row-data">${p} Din</span></td>
+            <td><span class="mobile-label">Absent:</span><span class="row-data">${a} Din</span></td>
+            <td><span class="mobile-label">Base Salary:</span><span class="row-data">₹${bs}</span></td>
+            <td><span class="mobile-label">Borrowing:</span><span class="row-data">₹${tb}</span></td>
+            <td><span class="mobile-label">Overtime:</span><span class="row-data">₹${totOt}</span></td>
+            <td><span class="mobile-label">Payable:</span><span class="row-data">₹${finPay}</span></td>
+            <td><span class="mobile-label">Action:</span><span class="row-data"><button type="button" onclick="deleteEntireMonth('${mKey}')" style="color:#ef4444; background:none; border:none; cursor:pointer;"><i class="fa-solid fa-trash-can"></i></button></span></td>
+        `;
         if (historyList) historyList.appendChild(tr);
     });
 }
