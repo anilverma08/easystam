@@ -43,7 +43,6 @@ styleFix.innerHTML = `
     @media (max-width: 768px) {
         .ledger-table-master, .ledger-table-master thead, .ledger-table-master tbody, .ledger-table-master th, .ledger-table-master td, .ledger-table-master tr,
         .history-table-master, .history-table-master thead, .history-table-master tbody, .history-table-master th, .history-table-master td, .history-table-master tr { display: block !important; }
-        .history-table-master thead { display: none !important; }
         .ledger-table-master thead, .history-table-master thead { display: none !important; }
         .ledger-table-master tr, .history-table-master tr { background: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; padding: 12px !important; margin-bottom: 15px !important; box-shadow: 0 2px 5px rgba(0,0,0,0.02) !important; }
         .ledger-table-master td, .history-table-master td { display: flex !important; justify-content: space-between !important; align-items: center !important; border: none !important; border-bottom: 1px dashed #f1f5f9 !important; padding: 8px 0 !important; }
@@ -150,7 +149,7 @@ window.handleDirectDeviceLogin = function() {
 
         if (!currentDevices.includes(currentDeviceCode)) {
             statusMsg.style.color = "#ef4444";
-            statusMsg.innerText = "Access Blocked: Yeh device aapki approved list mein nahi hai! Same ID teesre ke phone mein nahi chal sakti.";
+            statusMsg.innerText = "Access Blocked: Yeh device aapki approved list mein nahi hai!";
             localStorage.removeItem('trusted_device_' + safeEmailKey);
             window.checkDeviceTrustStatus();
             return;
@@ -295,7 +294,7 @@ window.handleRealRegistration = function(event) {
     });
 };
 
-// RECOVERY OTP REQUEST
+// RECOVERY OTP REQUEST (FIXED Path & registered check)
 window.requestRecoveryOTP = function() {
     const email = document.getElementById('forgot-email').value.trim().toLowerCase();
     const statusMsg = document.getElementById('recovery-status-msg');
@@ -310,7 +309,7 @@ window.requestRecoveryOTP = function() {
     fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`)
     .then(res => res.json())
     .then(cloudData => {
-        if (cloudData !== null) {
+        if (cloudData !== null && (cloudData.registered === true || cloudData.registered === "true")) {
             const recoveryOTP = Math.floor(100000 + Math.random() * 900000);
             recoveryOTPSession.generatedOTP = String(recoveryOTP);
             recoveryOTPSession.targetEmail = email;
@@ -333,6 +332,10 @@ window.requestRecoveryOTP = function() {
             statusMsg.style.color = "#ef4444";
             statusMsg.innerText = "This email is not registered anywhere!";
         }
+    })
+    .catch(() => {
+        statusMsg.style.color = "#ef4444";
+        statusMsg.innerText = "Connection failed.";
     });
 };
 
@@ -472,7 +475,6 @@ function openAbsentModal() {
 
 function closeAbsentModal() { if (absentModal) absentModal.style.display = 'none'; }
 
-// SCREENS SWITCH LOGIC (HANDLES ALL TOGGLES PROPERLY)
 function toggleAuthScreens(screenType) {
     if (loginScreen) loginScreen.style.setProperty('display', 'none', 'important');
     if (registerScreen) registerScreen.style.setProperty('display', 'none', 'important');
