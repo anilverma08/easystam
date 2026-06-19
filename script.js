@@ -294,6 +294,93 @@ window.handleRealRegistration = function(event) {
     });
 };
 
+// RECOVERY OTP REQUEST
+window.requestRecoveryOTP = function() {
+    const email = document.getElementById('forgot-email').value.trim().toLowerCase();
+    const statusMsg = document.getElementById('recovery-status-msg');
+    
+    if (!email) { alert("Kripya pehle apni Registered Email daalein!"); return; }
+
+    statusMsg.style.color = "#f59e0b";
+    statusMsg.innerText = "Checking email registration...";
+
+    const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
+
+    fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`)
+    .then(res => res.json())
+    .then(cloudData => {
+        if (cloudData !== null) {
+            const recoveryOTP = Math.floor(100000 + Math.random() * 900000);
+            recoveryOTPSession.generatedOTP = String(recoveryOTP);
+            recoveryOTPSession.targetEmail = email;
+            recoveryOTPSession.databaseUsername = cloudData.name ? cloudData.name : email.split('@')[0];
+
+            emailjs.send("service_f7w012p", "template_mpcvwoa", {
+                to_email: email,
+                otp_code: recoveryOTP
+            })
+            .then(() => {
+                statusMsg.style.color = "#10b981";
+                statusMsg.innerText = "OTP sent to your recovery email address!";
+                document.getElementById('recovery-step-otp').style.display = 'block';
+            })
+            .catch(() => {
+                statusMsg.style.color = "#ef4444";
+                statusMsg.innerText = "Failed to send recovery OTP.";
+            });
+        } else {
+            statusMsg.style.color = "#ef4444";
+            statusMsg.innerText = "This email is not registered anywhere!";
+        }
+    });
+};
+
+window.verifyRecoveryOTP = function() {
+    const inputOtp = document.getElementById('forgot-otp').value.trim();
+    const statusMsg = document.getElementById('recovery-status-msg');
+
+    if (!inputOtp) { alert("Kripya OTP enter karein."); return; }
+
+    if (inputOtp === recoveryOTPSession.generatedOTP) {
+        statusMsg.style.color = "#10b981";
+        statusMsg.innerText = "OTP Verified! Now choose a strong new password.";
+        document.getElementById('recovered-username').innerText = recoveryOTPSession.databaseUsername.toUpperCase();
+        document.getElementById('recovery-step-fields').style.display = 'block';
+    } else {
+        statusMsg.style.color = "#ef4444";
+        statusMsg.innerText = "Incorrect OTP code.";
+    }
+};
+
+window.handleRecoverySubmit = function(event) {
+    event.preventDefault();
+    const email = recoveryOTPSession.targetEmail;
+    const newPass = document.getElementById('forgot-new-pass').value.trim();
+    const statusMsg = document.getElementById('recovery-status-msg');
+
+    if (!newPass) { alert("New Password bharna mandatory hai!"); return; }
+
+    if(!validatePasswordStrength(newPass)) {
+        alert("⚠️ Password Strong Nahi Hai:\n\nKam se kam 8 letters lambha hona chahiye, aur usme ek Number (0-9), ek Alphabet Letter (a-z) aur ek Special character (!@#$%) hona jaroori hai!");
+        return;
+    }
+
+    const safeKey = email.replace(/[^a-zA-Z0-9]/g, "_");
+    
+    fetch(`${FIREBASE_DB_URL}records/${safeKey}/init.json`, {
+        method: 'PATCH',
+        body: JSON.stringify({ password: newPass, registered: true })
+    })
+    .then(() => {
+        toggleAuthScreens('login');
+        alert("🔐 Success: Aapka Admin password successfully reset ho gaya hai!");
+    })
+    .catch(() => {
+        statusMsg.style.color = "#ef4444";
+        statusMsg.innerText = "Error: Database update failed.";
+    });
+};
+
 function handleLogout() {
     if(confirm("Logout karein?")) {
         localStorage.removeItem('active_session_username'); 
@@ -384,13 +471,21 @@ function openAbsentModal() {
 
 function closeAbsentModal() { if (absentModal) absentModal.style.display = 'none'; }
 
+// FIXED: Screens switching toggle function handles forgot-screen perfectly now
 function toggleAuthScreens(screenType) {
     if (loginScreen) loginScreen.style.setProperty('display', 'none', 'important');
     if (registerScreen) registerScreen.style.setProperty('display', 'none', 'important');
     if (forgotScreen) forgotScreen.style.setProperty('display', 'none', 'important');
     
-    if (screenType === 'register') { registerScreen.style.setProperty('display', 'flex', 'important'); } 
-    else {
+    if (screenType === 'register') { 
+        registerScreen.style.setProperty('display', 'flex', 'important'); 
+    } else if (screenType === 'forgot') {
+        forgotScreen.style.setProperty('display', 'flex', 'important');
+        document.getElementById('recovery-step-otp').style.display = 'none';
+        document.getElementById('recovery-step-fields').style.display = 'none';
+        document.getElementById('recovery-status-msg').innerText = "";
+        document.getElementById('forgot-email').value = "";
+    } else {
         loginScreen.style.setProperty('display', 'flex', 'important');
         document.getElementById('otp-entry-section').style.setProperty('display', 'none', 'important');
         document.getElementById('auth-status-msg').innerText = "";
