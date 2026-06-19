@@ -96,7 +96,7 @@ function validatePasswordStrength(password) {
     return (password.length >= minLength && hasLetter && hasNumber && hasSpecial);
 }
 
-// Automatically checks device trust status dynamically
+// Automatically checks device trust status dynamically on typing email
 window.checkDeviceTrustStatus = function() {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const sendOtpBtn = document.getElementById('send-otp-btn');
@@ -122,7 +122,7 @@ window.checkDeviceTrustStatus = function() {
     }
 };
 
-// DIRECT SECURE PASSWORD LOGIN (FOR TRUSTED/REMEMBERED DEVICES)
+// DIRECT SECURE PASSWORD LOGIN (FOR TRUSTED/REMEMBERED DEVICES) - FIXED PASSWORD MISMATCH BUG
 window.handleDirectDeviceLogin = function() {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const password = document.getElementById('login-password').value.trim();
@@ -139,7 +139,7 @@ window.handleDirectDeviceLogin = function() {
     fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`)
     .then(res => res.json())
     .then(data => {
-        if (data === null || String(data.password) !== String(password)) {
+        if (data === null || String(data.password).trim() !== String(password).trim()) {
             statusMsg.style.color = "#ef4444";
             statusMsg.innerText = "Access Denied: Incorrect Password!";
             return;
@@ -149,7 +149,7 @@ window.handleDirectDeviceLogin = function() {
 
         if (!currentDevices.includes(currentDeviceCode)) {
             statusMsg.style.color = "#ef4444";
-            statusMsg.innerText = "Access Blocked: Yeh device aapki approved list mein nahi hai!";
+            statusMsg.innerText = "Access Blocked: New Device Detected! Please reverify via OTP.";
             localStorage.removeItem('trusted_device_' + safeEmailKey);
             window.checkDeviceTrustStatus();
             return;
@@ -167,7 +167,7 @@ window.handleDirectDeviceLogin = function() {
     });
 };
 
-// ORIGINAL OTP REQUEST FOR NEW/UNVERIFIED DEVICES
+// ORIGINAL OTP REQUEST FOR NEW/UNVERIFIED DEVICES - FIXED SECURE VALIDATION
 window.requestLoginOTP = function() {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const password = document.getElementById('login-password').value.trim();
@@ -176,7 +176,7 @@ window.requestLoginOTP = function() {
     if (!email || !password) { alert("Email aur Password dono bharna zaroori hai."); return; }
 
     statusMsg.style.color = "#f59e0b";
-    statusMsg.innerText = "Verifying credentials and structural hardware...";
+    statusMsg.innerText = "Verifying credentials...";
 
     const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
     const currentDeviceCode = getDeviceFingerprint();
@@ -184,7 +184,7 @@ window.requestLoginOTP = function() {
     fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`)
     .then(response => response.json())
     .then(data => {
-        if (data === null || String(data.password) !== String(password)) {
+        if (data === null || String(data.password).trim() !== String(password).trim()) {
             statusMsg.style.color = "#ef4444";
             statusMsg.innerText = "Access Denied: Invalid Credentials!";
             return;
@@ -369,7 +369,7 @@ window.handleRecoverySubmit = function(event) {
     if (!newPass) { alert("New Password bharna mandatory hai!"); return; }
 
     if(!validatePasswordStrength(newPass)) {
-        alert("⚠️ Password Strong Nahi Hai:\n\nKam se kam 8 letters lambha hona chahiye, aur usme ek Number (0-9), ek Alphabet Letter (a-z) aur ek Special character (!@#$%) hona jaroori hai!");
+        alert("⚠️ Password Strong Nahi Hai!\nKam se kam 8 letters lambha hona chahiye.");
         return;
     }
 
@@ -381,7 +381,7 @@ window.handleRecoverySubmit = function(event) {
     })
     .then(() => {
         toggleAuthScreens('login');
-        alert("🔐 Success: Aapka Admin password successfully reset ho gaya hai!");
+        alert("🔐 Success: Aapka password successfully reset ho gaya hai!");
     })
     .catch(() => {
         statusMsg.style.color = "#ef4444";
@@ -554,7 +554,6 @@ function editRecord(targetDate) {
 function deleteRecord(targetDate) { if (confirm("Din delete karein?")) { records = records.filter(r => r && r.date !== targetDate); render(); syncAndRefresh(); } }
 function deleteEntireMonth(mKey) { if (confirm("Poora mahina delete karein?")) { records = records.filter(r => r && r.date && r.date.substring(0, 7) !== mKey); render(); syncAndRefresh(); } }
 
-// RESTORED REASON COLUMN RENDER SYSTEM
 function render() {
     const masterTableElement = document.getElementById('live-ledger-table-id'); if (!masterTableElement) return;
     if (historyList) historyList.innerHTML = "";
