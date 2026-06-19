@@ -3,7 +3,7 @@ const FIREBASE_DB_URL = "https://ea-systam-default-rtdb.firebaseio.com/";
 let records = [];
 let currentAdminUsername = localStorage.getItem('active_session_username') || 'admin';
 
-// NEW: Generates a unique digital fingerprint for each device/browser
+// Generates a unique digital fingerprint for each device/browser
 function getDeviceFingerprint() {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -86,7 +86,7 @@ window.initDashboard = function() {
 
 window.renderLedger = function() { render(); };
 
-let localOTPSession = { generatedOTP: null, targetEmail: null };
+let localOTPSession = { generatedOTP: null, targetEmail: null, deviceToWhitelist: null, updatedDeviceList: [] };
 let recoveryOTPSession = { generatedOTP: null, targetEmail: null, databaseUsername: null };
 
 function validatePasswordStrength(password) {
@@ -97,7 +97,7 @@ function validatePasswordStrength(password) {
     return (password.length >= minLength && hasLetter && hasNumber && hasSpecial);
 }
 
-// SECURE LOGIN WITH DEVICE LOCK FINGERPRINT
+// SECURE LOGIN WITH MASTER LOCK AND DYNAMIC SLOT 2 SHIFT
 window.requestLoginOTP = function() {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const password = document.getElementById('login-password').value.trim();
@@ -114,7 +114,7 @@ window.requestLoginOTP = function() {
     }
 
     statusMsg.style.color = "#f59e0b";
-    statusMsg.innerText = "Verifying device hardware and security keys...";
+    statusMsg.innerText = "Verifying credentials and managing secure slots...";
 
     const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
     const currentDeviceCode = getDeviceFingerprint();
@@ -136,16 +136,24 @@ window.requestLoginOTP = function() {
             return;
         }
 
-        // CRITICAL CHECK: Check if current device fingerprint is approved on cloud
-        if (data.devices && !data.devices.includes(currentDeviceCode)) {
-            statusMsg.style.color = "#ef4444";
-            statusMsg.innerText = "Security Alert: This hardware device is not approved by Admin!";
-            alert("🔒 Access Blocked: Yeh device aapki approved list mein nahi hai! Same ID teesre ke phone mein nahi chal sakti.");
-            document.getElementById('otp-entry-section').style.display = 'none';
-            return;
+        let currentDevices = Array.isArray(data.devices) ? data.devices.filter(Boolean) : [];
+
+        // Condition Check: Agar device pehle se list mein nahi hai
+        if (!currentDevices.includes(currentDeviceCode)) {
+            if (currentDevices.length >= 2) {
+                // RULE: Slot 1 (Index 0) Master safe rahega, Slot 2 (Index 1) overwrite hoga
+                currentDevices[1] = currentDeviceCode;
+            } else {
+                currentDevices.push(currentDeviceCode);
+            }
+            localOTPSession.deviceToWhitelist = currentDeviceCode;
+            localOTPSession.updatedDeviceList = currentDevices;
+        } else {
+            localOTPSession.deviceToWhitelist = null;
+            localOTPSession.updatedDeviceList = currentDevices;
         }
 
-        // Send OTP if everything is correct
+        // Generate and Send OTP
         const realOTP = Math.floor(100000 + Math.random() * 900000);
         localOTPSession.generatedOTP = String(realOTP);
         localOTPSession.targetEmail = email;
@@ -156,7 +164,7 @@ window.requestLoginOTP = function() {
         })
         .then(() => {
             statusMsg.style.color = "#10b981";
-            statusMsg.innerText = "Password & Device Approved! OTP sent successfully.";
+            statusMsg.innerText = "Credentials verified! OTP sent successfully.";
             document.getElementById('otp-entry-section').style.display = 'block';
         })
         .catch(() => {
@@ -174,21 +182,30 @@ window.verifyLoginOTP = function() {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const otp = document.getElementById('login-otp').value.trim();
     const statusMsg = document.getElementById('auth-status-msg');
+    const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
 
     if (!otp) { alert("Kripya OTP code enter karein."); return; }
 
     if (email === localOTPSession.targetEmail && otp === localOTPSession.generatedOTP) {
-        localStorage.setItem('active_session_username', email);
-        statusMsg.style.color = "#10b981";
-        statusMsg.innerText = "Login successful!";
-        forceOpenDashboard();
+        
+        // Save dynamic shift to Firebase immediately after OTP success
+        fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init/devices.json`, {
+            method: 'PUT',
+            body: JSON.stringify(localOTPSession.updatedDeviceList)
+        })
+        .then(() => {
+            localStorage.setItem('active_session_username', email);
+            statusMsg.style.color = "#10b981";
+            statusMsg.innerText = "Login successful!";
+            forceOpenDashboard();
+        });
     } else {
         statusMsg.style.color = "#ef4444";
         statusMsg.innerText = "Galat OTP code!";
     }
 };
 
-// LIVE CLOUD REGISTRATION WITH AUTOMATIC DEVICE WHITELISTING & DUPLICATE CHECK
+// LIVE CLOUD REGISTRATION WITH AUTOMATIC SLOT 1 (MASTER) LOCK
 window.handleRealRegistration = function(event) {
     event.preventDefault();
     const username = document.getElementById('reg-user').value.trim();
@@ -216,20 +233,19 @@ window.handleRealRegistration = function(event) {
             return;
         }
 
-        // Whitelist the current phone during registration automatically
         fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`, { 
             method: 'PUT', 
             body: JSON.stringify({ 
                 registered: true, 
                 name: username, 
                 password: password,
-                devices: [primaryDevice],
+                devices: [primaryDevice], // Un-removable primary master device slot
                 timestamp: Date.now() 
             }) 
         })
         .then(() => {
             toggleAuthScreens('login');
-            alert("✅ Account Registered! Aapka yeh phone automatic approve ho gaya hai.");
+            alert("✅ Registered! Yeh aapka Master Device (Slot 1) ban gaya hai aur kabhi auto-logout nahi hoga.");
         });
     });
 };
@@ -321,6 +337,38 @@ window.handleRecoverySubmit = function(event) {
     });
 };
 
+// LOGOUT WITH DYNAMIC DEVICE CLEANUP
+function handleLogout() {
+    if(confirm("Logout karein?")) {
+        const email = localStorage.getItem('active_session_username');
+        if (email) {
+            const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
+            const currentDeviceCode = getDeviceFingerprint();
+
+            fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init/devices.json`)
+            .then(res => res.json())
+            .then(devices => {
+                if (Array.isArray(devices)) {
+                    // Current dynamic hardware code clean karein, master index 0 ignore karein
+                    let updatedDevices = devices.filter((d, index) => d !== currentDeviceCode || index === 0);
+                    fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init/devices.json`, {
+                        method: 'PUT',
+                        body: JSON.stringify(updatedDevices)
+                    }).then(() => { completeLogoutAction(); });
+                } else { completeLogoutAction(); }
+            }).catch(() => { completeLogoutAction(); });
+        } else { completeLogoutAction(); }
+    }
+}
+
+function completeLogoutAction() {
+    localStorage.removeItem('active_session_username'); 
+    records = []; 
+    document.body.classList.add('logged-out-state');
+    if (mainDashboard) mainDashboard.style.setProperty('display', 'none', 'important');
+    if (loginScreen) loginScreen.style.setProperty('display', 'flex', 'important');
+}
+
 function forceOpenDashboard() {
     document.body.classList.remove('logged-out-state');
     if (loginScreen) loginScreen.style.setProperty('display', 'none', 'important');
@@ -332,21 +380,14 @@ function forceOpenDashboard() {
     currentAdminUsername = rawUserEmail.replace(/[^a-zA-Z0-9]/g, "_");
     
     let finalDisplayName = localStorage.getItem('registered_name_' + currentAdminUsername);
-    if (!finalDisplayName) {
-        finalDisplayName = rawUserEmail.split('@')[0];
-    }
-    
-    if (welcomeUserText) {
-        welcomeUserText.innerHTML = `<i class="fa-solid fa-circle-user"></i> Admin: ${finalDisplayName.toUpperCase()}`;
-    }
-    
+    if (!finalDisplayName) { finalDisplayName = rawUserEmail.split('@')[0]; }
+    if (welcomeUserText) { welcomeUserText.innerHTML = `<i class="fa-solid fa-circle-user"></i> Admin: ${finalDisplayName.toUpperCase()}`; }
     loadOnlineData();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    if(localStorage.getItem('active_session_username')) {
-        forceOpenDashboard();
-    } else {
+    if(localStorage.getItem('active_session_username')) { forceOpenDashboard(); } 
+    else {
         document.body.classList.add('logged-out-state');
         if (mainDashboard) mainDashboard.style.setProperty('display', 'none', 'important');
         if (loginScreen) loginScreen.style.setProperty('display', 'flex', 'important');
@@ -374,6 +415,13 @@ function toggleThreeDotMenu(event) {
         else { dropdownContainer.style.display = 'block'; }
     }
 }
+
+// Global click handling to automatically collapse the three-dot dropdown
+document.addEventListener('click', () => {
+    if (dropdownContainer && dropdownContainer.style.display === 'block') {
+        dropdownContainer.style.display = 'none';
+    }
+});
 
 function openHistoryModal() {
     if (dropdownContainer) { dropdownContainer.style.display = 'none'; }
@@ -403,9 +451,8 @@ function toggleAuthScreens(screenType) {
     if (registerScreen) registerScreen.style.setProperty('display', 'none', 'important');
     if (forgotScreen) forgotScreen.style.setProperty('display', 'none', 'important');
     
-    if (screenType === 'register') {
-        registerScreen.style.setProperty('display', 'flex', 'important');
-    } else if (screenType === 'forgot') {
+    if (screenType === 'register') { registerScreen.style.setProperty('display', 'flex', 'important'); } 
+    else if (screenType === 'forgot') {
         forgotScreen.style.setProperty('display', 'flex', 'important');
         document.getElementById('recovery-step-otp').style.display = 'none';
         document.getElementById('recovery-step-fields').style.display = 'none';
@@ -425,9 +472,7 @@ async function loadOnlineData() {
         if(data) {
             let parsed = Array.isArray(data) ? data.filter(Boolean) : Object.values(data);
             records = parsed.filter(r => r && r.date);
-        } else {
-            records = [];
-        }
+        } else { records = []; }
         render();
     } catch (e) { records = []; render(); }
 }
@@ -439,16 +484,6 @@ async function syncAndRefresh() {
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(records.filter(i => i && i.date))
         });
     } catch (e) {}
-}
-
-function handleLogout() {
-    if(confirm("Logout karein?")) { 
-        localStorage.removeItem('active_session_username'); 
-        records = []; 
-        document.body.classList.add('logged-out-state');
-        if (mainDashboard) mainDashboard.style.setProperty('display', 'none', 'important');
-        if (loginScreen) loginScreen.style.setProperty('display', 'flex', 'important');
-    }
 }
 
 function saveAttendanceStatus(statusValue, reasonValue) {
@@ -467,6 +502,7 @@ function saveAttendanceStatus(statusValue, reasonValue) {
     render(); syncAndRefresh();
 }
 
+// ... Baaki saare layout/render functions same hain ...
 function editRecord(targetDate) {
     const item = records.find(r => r && r.date === targetDate);
     if (item) {
