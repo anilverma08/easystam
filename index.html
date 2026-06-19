@@ -16,6 +16,7 @@
 </head>
 <body>
 
+    <!-- 1. ADMIN LOGIN SCREEN -->
     <div id="login-screen" style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; width: 100%;">
         <form id="login-form" onsubmit="return false;" style="background: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px;">
             <h2 style="text-align: center; margin-bottom: 20px; color: #1e1b4b;">Admin Login</h2>
@@ -30,10 +31,12 @@
                 <input type="password" id="login-password" placeholder="••••••••" required style="width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px;">
             </div>
 
+            <!-- BUTTON 1: For Unknown Devices (Requires OTP Verification) -->
             <button type="button" id="send-otp-btn" onclick="requestLoginOTP()" style="display: block; width: 100%; padding: 12px; background: #4f46e5; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.3s;">
                 <i class="fa-solid fa-paper-plane"></i> Send OTP
             </button>
 
+            <!-- BUTTON 2: For Trusted Devices (Direct Secure Password Bypass) -->
             <button type="button" id="direct-login-btn" onclick="handleDirectDeviceLogin()" style="display: none; width: 100%; padding: 12px; background: #10b981; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.3s;">
                 <i class="fa-solid fa-right-to-bracket"></i> Secure Login
             </button>
@@ -59,6 +62,7 @@
         </form>
     </div>
 
+    <!-- 2. CREATE ADMIN (REGISTER SCREEN) -->
     <div id="register-screen" style="display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; width: 100%;">
         <form id="register-form" onsubmit="handleRealRegistration(event);" style="background: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px;">
             <h2 style="text-align: center; margin-bottom: 20px; color: #1e1b4b;">Create Admin</h2>
@@ -71,6 +75,7 @@
         </form>
     </div>
 
+    <!-- 3. ACCOUNT RECOVERY (FORGOT SCREEN) -->
     <div id="forgot-screen" style="display: none; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; width: 100%;">
         <form id="forgot-form" onsubmit="handleRecoverySubmit(event);" style="background: #ffffff; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px;">
             <h2 style="text-align: center; margin-bottom: 20px; color: #1e1b4b;">Account Recovery</h2>
@@ -115,6 +120,7 @@
         </form>
     </div>
 
+    <!-- Modals & Dashboard -->
     <div id="absent-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999999; justify-content: center; align-items: center; padding: 15px;">
         <div style="background: white; padding: 25px; border-radius: 12px; width: 100%; max-width: 400px;">
             <h3 style="margin-top: 0; color: #ef4444;"><i class="fa-solid fa-circle-question"></i> Absent Ka Reason Likhein</h3>
@@ -180,7 +186,10 @@
             <form id="ledger-form" onsubmit="event.preventDefault();">
                 <input type="hidden" id="edit-index">
                 <div style="margin-bottom: 15px;"><label>Select Date</label><input type="date" id="input-date" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px;"></div>
-                <div style="margin-bottom: 15px;"><label>Monthly Base Salary (₹)</label><input type="number" id="input-salary" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px;"></div>
+                
+                <!-- NEW CHANGES: Placeholder added to Monthly Base Salary input -->
+                <div style="margin-bottom: 15px;"><label>Monthly Base Salary (₹)</label><input type="number" id="input-salary" placeholder="e.g. 12000" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px;"></div>
+                
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
                     <div><label>Borrowing (₹)</label><input type="number" id="input-borrowing" value="0" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px;"></div>
                     <div><label>Overtime (₹)</label><input type="number" id="input-overtime" value="0" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px;"></div>
@@ -197,6 +206,7 @@
         <div class="table-section"><div class="responsive-table-wrapper"><table class="ledger-table-master" id="live-ledger-table-id"></table></div></div>
     </div>
 
-    <script src="script.js?v=40.0"></script>
+    <!-- Script version bumped to clear mobile cache instantly -->
+    <script src="script.js?v=52.0"></script>
 </body>
 </html>
