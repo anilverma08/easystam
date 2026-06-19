@@ -96,7 +96,7 @@ function validatePasswordStrength(password) {
     return (password.length >= minLength && hasLetter && hasNumber && hasSpecial);
 }
 
-// Automatically checks device trust status dynamically on typing email
+// Automatically checks device trust status dynamically
 window.checkDeviceTrustStatus = function() {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const sendOtpBtn = document.getElementById('send-otp-btn');
@@ -122,7 +122,7 @@ window.checkDeviceTrustStatus = function() {
     }
 };
 
-// DIRECT SECURE PASSWORD LOGIN (FOR TRUSTED/REMEMBERED DEVICES) - FIXED PASSWORD MISMATCH BUG
+// DIRECT SECURE PASSWORD LOGIN
 window.handleDirectDeviceLogin = function() {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const password = document.getElementById('login-password').value.trim();
@@ -167,7 +167,7 @@ window.handleDirectDeviceLogin = function() {
     });
 };
 
-// ORIGINAL OTP REQUEST FOR NEW/UNVERIFIED DEVICES - FIXED SECURE VALIDATION
+// ORIGINAL OTP REQUEST FOR NEW/UNVERIFIED DEVICES
 window.requestLoginOTP = function() {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const password = document.getElementById('login-password').value.trim();
@@ -539,6 +539,11 @@ function saveAttendanceStatus(statusValue, reasonValue) {
     if (!selectedDate || salary <= 0) { alert("Sahi details bharein!"); return; }
     records = records.filter(item => item && item.date !== selectedDate);
     records.push({ date: selectedDate, status: statusValue, salary: salary, borrowing: parseFloat(borrowingInput.value)||0, overtime: parseFloat(overtimeInput.value)||0, reason: reasonValue });
+    
+    // NEW CHANGES: Reset borrowing and overtime fields on form submission instantly
+    if (borrowingInput) borrowingInput.value = "0";
+    if (overtimeInput) overtimeInput.value = "0";
+    
     render(); syncAndRefresh();
 }
 
@@ -586,15 +591,21 @@ function render() {
     const allFilteredRecords = records.filter(item => item && item.date && item.date.substring(0, 7) === activeViewMonthKey);
     const hasAnyAbsentReason = allFilteredRecords.some(item => item.status === 'Absent' && item.reason && item.reason.trim() !== "");
 
+    // NEW CHANGES: Mobile card rendering conditional structure logic (No empty reason rows)
     let tableHeaderHtml = `<thead><tr><th>Date</th><th>Status</th>${hasAnyAbsentReason ? `<th>Reason</th>` : ''}<th>Borrowing</th><th>Overtime</th><th>Action</th></tr></thead><tbody>`;
     
     allFilteredRecords.forEach(item => {
         let badgeClass = item.status === 'Absent' ? 'badge-absent' : (item.status === 'Half Day' ? 'badge-halfday' : (item.status === 'Paid Leave' ? 'badge-leave' : 'badge-present'));
         
         let reasonTdHtml = '';
+        // If a month has an absent reason, render column row condition
         if (hasAnyAbsentReason) {
-            let displayReason = (item.reason && item.reason.trim() !== "") ? item.reason : "—";
-            reasonTdHtml = `<td><span class="mobile-label">Reason:</span><span class="row-data" style="font-style: italic; color: #64748b;">${displayReason}</span></td>`;
+            if (item.reason && item.reason.trim() !== "") {
+                reasonTdHtml = `<td><span class="mobile-label">Reason:</span><span class="row-data" style="font-style: italic; color: #64748b;">${item.reason}</span></td>`;
+            } else {
+                // If this specific card has no reason, completely hide row from mobile structure view
+                reasonTdHtml = `<td class="reason-mobile-row" style="display:none !important;"><span class="mobile-label">Reason:</span><span class="row-data">—</span></td>`;
+            }
         }
 
         tableHeaderHtml += `
