@@ -85,7 +85,7 @@ window.initDashboard = function() {
 
 window.renderLedger = function() { render(); };
 
-let localOTPSession = { generatedOTP: null, targetEmail: null, deviceToWhitelist: null, updatedDeviceList: [] };
+let localOTPSession = { generatedOTP: null, targetEmail: null, deviceToWhitelist: null, updatedDeviceList: [], registeredName: null };
 let recoveryOTPSession = { generatedOTP: null, targetEmail: null, databaseUsername: null };
 
 function validatePasswordStrength(password) {
@@ -156,6 +156,7 @@ window.handleDirectDeviceLogin = function() {
         }
 
         localStorage.setItem('active_session_username', email);
+        localStorage.setItem('registered_full_name_' + safeEmailKey, data.name || email.split('@')[0]);
         statusMsg.style.color = "#10b981";
         statusMsg.innerText = "Welcome back!";
         forceOpenDashboard();
@@ -204,6 +205,7 @@ window.requestLoginOTP = function() {
             localOTPSession.updatedDeviceList = currentDevices;
         }
 
+        localOTPSession.registeredName = data.name || email.split('@')[0];
         const realOTP = Math.floor(100000 + Math.random() * 900000);
         localOTPSession.generatedOTP = String(realOTP);
         localOTPSession.targetEmail = email;
@@ -240,6 +242,7 @@ window.verifyLoginOTP = function() {
         })
         .then(() => {
             localStorage.setItem('active_session_username', email);
+            localStorage.setItem('registered_full_name_' + safeEmailKey, localOTPSession.registeredName);
             localStorage.setItem('trusted_device_' + safeEmailKey, 'true'); 
             statusMsg.style.color = "#10b981";
             statusMsg.innerText = "Login successful!";
@@ -284,6 +287,7 @@ window.handleRealRegistration = function(event) {
         })
         .then(() => {
             toggleAuthScreens('login');
+            localStorage.setItem('registered_full_name_' + safeEmailKey, username);
             localStorage.setItem('trusted_device_' + safeEmailKey, 'true'); 
             const statusMsg = document.getElementById('auth-status-msg');
             if (statusMsg) {
@@ -294,7 +298,7 @@ window.handleRealRegistration = function(event) {
     });
 };
 
-// RECOVERY OTP REQUEST (FIXED Path & registered check)
+// RECOVERY OTP REQUEST
 window.requestRecoveryOTP = function() {
     const email = document.getElementById('forgot-email').value.trim().toLowerCase();
     const statusMsg = document.getElementById('recovery-status-msg');
@@ -348,7 +352,7 @@ window.verifyRecoveryOTP = function() {
     if (inputOtp === recoveryOTPSession.generatedOTP) {
         statusMsg.style.color = "#10b981";
         statusMsg.innerText = "OTP Verified! Now choose a strong new password.";
-        document.getElementById('recovered-username').innerText = recoveryOTPSession.databaseUsername.toUpperCase();
+        document.getElementById('recovered-username').innerText = recoveryOTPSession.databaseUsername;
         document.getElementById('recovery-step-fields').style.display = 'block';
     } else {
         statusMsg.style.color = "#ef4444";
@@ -396,6 +400,7 @@ function handleLogout() {
     }
 }
 
+// FIXED NAME CAPTURING AND RENDERING
 function forceOpenDashboard() {
     document.body.classList.remove('logged-out-state');
     if (loginScreen) loginScreen.style.setProperty('display', 'none', 'important');
@@ -406,7 +411,24 @@ function forceOpenDashboard() {
     let rawUserEmail = localStorage.getItem('active_session_username') || 'admin';
     currentAdminUsername = rawUserEmail.replace(/[^a-zA-Z0-9]/g, "_");
     
-    if (welcomeUserText) { welcomeUserText.innerHTML = `<i class="fa-solid fa-circle-user"></i> Admin: ${rawUserEmail.split('@')[0].toUpperCase()}`; }
+    // Fallback logic to look for the structural local full name, else fetch it from cloud database dynamically
+    let finalDisplayName = localStorage.getItem('registered_full_name_' + currentAdminUsername);
+    
+    if (finalDisplayName) {
+        if (welcomeUserText) { welcomeUserText.innerHTML = `<i class="fa-solid fa-circle-user"></i> Admin: ${finalDisplayName.toUpperCase()}`; }
+    } else {
+        if (welcomeUserText) { welcomeUserText.innerHTML = `<i class="fa-solid fa-circle-user"></i> Admin: LOADING...`; }
+        fetch(`${FIREBASE_DB_URL}records/${currentAdminUsername}/init.json`)
+        .then(res => res.json())
+        .then(data => {
+            let fetchedName = (data && data.name) ? data.name : rawUserEmail.split('@')[0];
+            localStorage.setItem('registered_full_name_' + currentAdminUsername, fetchedName);
+            if (welcomeUserText) { welcomeUserText.innerHTML = `<i class="fa-solid fa-circle-user"></i> Admin: ${fetchedName.toUpperCase()}`; }
+        })
+        .catch(() => {
+            if (welcomeUserText) { welcomeUserText.innerHTML = `<i class="fa-solid fa-circle-user"></i> Admin: ${rawUserEmail.split('@')[0].toUpperCase()}`; }
+        });
+    }
     loadOnlineData();
 }
 
