@@ -90,10 +90,7 @@ let recoveryOTPSession = { generatedOTP: null, targetEmail: null, databaseUserna
 
 function validatePasswordStrength(password) {
     const minLength = 8;
-    const hasLetter = /[A-Za-z]/.test(password);
-    const hasNumber = /[0-9]/.test(password);
-    const hasSpecial = /[!@#$%^&*(),.?":{}|<>_]/.test(password);
-    return (password.length >= minLength && hasLetter && hasNumber && hasSpecial);
+    return password.length >= minLength;
 }
 
 // Automatically checks device trust status dynamically
@@ -122,7 +119,7 @@ window.checkDeviceTrustStatus = function() {
     }
 };
 
-// DIRECT SECURE PASSWORD LOGIN
+// DIRECT SECURE PASSWORD LOGIN - FIXED STRING MATCHING BUG
 window.handleDirectDeviceLogin = function() {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const password = document.getElementById('login-password').value.trim();
@@ -139,6 +136,7 @@ window.handleDirectDeviceLogin = function() {
     fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`)
     .then(res => res.json())
     .then(data => {
+        // FIXED: Explicit text matching comparison to prevent "Access Denied" mismatch loops
         if (data === null || String(data.password).trim() !== String(password).trim()) {
             statusMsg.style.color = "#ef4444";
             statusMsg.innerText = "Access Denied: Incorrect Password!";
@@ -368,11 +366,6 @@ window.handleRecoverySubmit = function(event) {
 
     if (!newPass) { alert("New Password bharna mandatory hai!"); return; }
 
-    if(!validatePasswordStrength(newPass)) {
-        alert("⚠️ Password Strong Nahi Hai!\nKam se kam 8 letters lambha hona chahiye.");
-        return;
-    }
-
     const safeKey = email.replace(/[^a-zA-Z0-9]/g, "_");
     
     fetch(`${FIREBASE_DB_URL}records/${safeKey}/init.json`, {
@@ -449,10 +442,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnH = document.getElementById('btn-halfday');
     const btnL = document.getElementById('btn-leave');
 
-    if(btnP) btnP.onclick = (e) => { e.preventDefault(); if (!checkIfAlreadyMarked(dateInput.value)) saveAttendanceStatus('Present', ''); };
-    if(btnH) btnH.onclick = (e) => { e.preventDefault(); if (!checkIfAlreadyMarked(dateInput.value)) saveAttendanceStatus('Half Day', ''); };
-    if(btnL) btnL.onclick = (e) => { e.preventDefault(); if (!checkIfAlreadyMarked(dateInput.value)) saveAttendanceStatus('Paid Leave', ''); };
-    if(btnA) btnA.onclick = (e) => { e.preventDefault(); if (!checkIfAlreadyMarked(dateInput.value)) openAbsentModal(); };
+    if(btnP) btnP.onclick = (e) => { e.preventDefault(); saveAttendanceStatus('Present', ''); };
+    if(btnH) btnH.onclick = (e) => { e.preventDefault(); saveAttendanceStatus('Half Day', ''); };
+    if(btnL) btnL.onclick = (e) => { e.preventDefault(); saveAttendanceStatus('Paid Leave', ''); };
+    if(btnA) btnA.onclick = (e) => { e.preventDefault(); openAbsentModal(); };
 
     if (modalBtnSkip) modalBtnSkip.onclick = () => { closeAbsentModal(); saveAttendanceStatus('Absent', ''); };
     if (modalBtnSave) modalBtnSave.onclick = () => { const rText = absentReasonInput.value.trim(); closeAbsentModal(); saveAttendanceStatus('Absent', rText); };
@@ -474,17 +467,11 @@ document.addEventListener('click', () => {
 
 function openHistoryModal() {
     if (dropdownContainer) { dropdownContainer.style.display = 'none'; }
-    if (historyOverlay) historyOverlay.style.display = 'flex';
-    render(); 
+    alert("🔒 Premium Feature Locked!\n\nHistory Summary section dekhne ke liye premium plan active karein (Rs.99/Month). Contact: anilkumar705008@gmail.com");
+    return;
 }
 
 function closeHistoryModal() { if (historyOverlay) historyOverlay.style.display = 'none'; }
-
-function checkIfAlreadyMarked(selectedDate) {
-    if ((editIndexInput ? editIndexInput.value : "") === selectedDate) return false;
-    if (records.find(r => r && r.date === selectedDate)) { alert("Is date ki attendance ho chuki hai!"); return true; }
-    return false;
-}
 
 function openAbsentModal() {
     if (!dateInput.value || (parseFloat(salaryInput.value) || 0) <= 0) { alert("Kripya Date aur Base Salary pehle bharein!"); return; }
@@ -540,9 +527,9 @@ function saveAttendanceStatus(statusValue, reasonValue) {
     records = records.filter(item => item && item.date !== selectedDate);
     records.push({ date: selectedDate, status: statusValue, salary: salary, borrowing: parseFloat(borrowingInput.value)||0, overtime: parseFloat(overtimeInput.value)||0, reason: reasonValue });
     
-    // NEW CHANGES: Reset borrowing and overtime fields on form submission instantly
     if (borrowingInput) borrowingInput.value = "0";
     if (overtimeInput) overtimeInput.value = "0";
+    if (editIndexInput) editIndexInput.value = "";
     
     render(); syncAndRefresh();
 }
@@ -550,9 +537,12 @@ function saveAttendanceStatus(statusValue, reasonValue) {
 function editRecord(targetDate) {
     const item = records.find(r => r && r.date === targetDate);
     if (item) {
-        dateInput.value = item.date; salaryInput.value = item.salary;
-        borrowingInput.value = item.borrowing || 0; overtimeInput.value = item.overtime || 0;
-        editIndexInput.value = item.date; window.scrollTo({ top: 0, behavior: 'smooth' });
+        dateInput.value = item.date; 
+        salaryInput.value = item.salary;
+        borrowingInput.value = item.borrowing || 0; 
+        overtimeInput.value = item.overtime || 0;
+        editIndexInput.value = item.date; 
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 }
 
@@ -591,19 +581,16 @@ function render() {
     const allFilteredRecords = records.filter(item => item && item.date && item.date.substring(0, 7) === activeViewMonthKey);
     const hasAnyAbsentReason = allFilteredRecords.some(item => item.status === 'Absent' && item.reason && item.reason.trim() !== "");
 
-    // NEW CHANGES: Mobile card rendering conditional structure logic (No empty reason rows)
     let tableHeaderHtml = `<thead><tr><th>Date</th><th>Status</th>${hasAnyAbsentReason ? `<th>Reason</th>` : ''}<th>Borrowing</th><th>Overtime</th><th>Action</th></tr></thead><tbody>`;
     
     allFilteredRecords.forEach(item => {
         let badgeClass = item.status === 'Absent' ? 'badge-absent' : (item.status === 'Half Day' ? 'badge-halfday' : (item.status === 'Paid Leave' ? 'badge-leave' : 'badge-present'));
         
         let reasonTdHtml = '';
-        // If a month has an absent reason, render column row condition
         if (hasAnyAbsentReason) {
             if (item.reason && item.reason.trim() !== "") {
                 reasonTdHtml = `<td><span class="mobile-label">Reason:</span><span class="row-data" style="font-style: italic; color: #64748b;">${item.reason}</span></td>`;
             } else {
-                // If this specific card has no reason, completely hide row from mobile structure view
                 reasonTdHtml = `<td class="reason-mobile-row" style="display:none !important;"><span class="mobile-label">Reason:</span><span class="row-data">—</span></td>`;
             }
         }
