@@ -37,7 +37,30 @@ styleFix.innerHTML = `
     .badge-absent { background-color: #fef2f2; color: #991b1b; }
     .badge-halfday { background-color: #dbeafe; color: #1e40af; }
     .badge-leave { background-color: #f1f5f9; color: #334155; }
-    #threedot-dropdown-container button:hover { background-color: #f1f5f9 !important; color: #4f46e5 !important; }
+    
+    /* IMPROVED HIGHLY VISIBLE HISTORY BUTTON LAYOUT */
+    #threedot-dropdown-container button { 
+        width: 100% !important; 
+        text-align: left !important; 
+        background: #4f46e5 !important; 
+        color: white !important; 
+        padding: 14px 18px !important; 
+        cursor: pointer !important; 
+        font-weight: 700 !important; 
+        font-size: 15px !important; 
+        border: none !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2) !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 10px !important;
+        transition: all 0.2s ease !important;
+    }
+    #threedot-dropdown-container button:hover { 
+        background-color: #4338ca !important; 
+        transform: scale(1.02) !important;
+    }
+    
     #btn-present, #btn-absent, #btn-halfday, #btn-leave, #send-otp-btn { position: relative !important; z-index: 9999 !important; pointer-events: auto !important; cursor: pointer !important; }
     @media (min-width: 769px) { .kpi-container { grid-template-columns: repeat(4, 1fr) !important; } }
     @media (max-width: 768px) {
@@ -89,8 +112,7 @@ let localOTPSession = { generatedOTP: null, targetEmail: null, deviceToWhitelist
 let recoveryOTPSession = { generatedOTP: null, targetEmail: null, databaseUsername: null };
 
 function validatePasswordStrength(password) {
-    const minLength = 8;
-    return password.length >= minLength;
+    return password.length >= 8;
 }
 
 // Automatically checks device trust status dynamically
@@ -119,7 +141,7 @@ window.checkDeviceTrustStatus = function() {
     }
 };
 
-// DIRECT SECURE PASSWORD LOGIN - FIXED STRING MATCHING BUG
+// DIRECT SECURE PASSWORD LOGIN - CRITICAL FIX FOR LOGOUT/INCORRECT LOOP
 window.handleDirectDeviceLogin = function() {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const password = document.getElementById('login-password').value.trim();
@@ -136,7 +158,6 @@ window.handleDirectDeviceLogin = function() {
     fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`)
     .then(res => res.json())
     .then(data => {
-        // FIXED: Explicit text matching comparison to prevent "Access Denied" mismatch loops
         if (data === null || String(data.password).trim() !== String(password).trim()) {
             statusMsg.style.color = "#ef4444";
             statusMsg.innerText = "Access Denied: Incorrect Password!";
@@ -465,10 +486,11 @@ document.addEventListener('click', () => {
     }
 });
 
+// PREMIUM WALL REMOVED COMPLETELY - OPENS HISTORY DIRECTLY FOR ALL USERS
 function openHistoryModal() {
     if (dropdownContainer) { dropdownContainer.style.display = 'none'; }
-    alert("🔒 Premium Feature Locked!\n\nHistory Summary section dekhne ke liye premium plan active karein (Rs.99/Month). Contact: anilkumar705008@gmail.com");
-    return;
+    if (historyOverlay) historyOverlay.style.display = 'flex';
+    render(); 
 }
 
 function closeHistoryModal() { if (historyOverlay) historyOverlay.style.display = 'none'; }
