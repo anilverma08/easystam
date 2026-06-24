@@ -1,3 +1,4 @@
+// VERSION 103.0 - SECURE AUTH WITH LATEST DATE ON TOP
 const FIREBASE_DB_URL = "https://ea-systam-default-rtdb.firebaseio.com/";
 
 let records = [];
@@ -115,33 +116,18 @@ function validatePasswordStrength(password) {
     return password.length >= 8;
 }
 
-// Automatically checks device trust status dynamically
+// Automatically ensures password login is always accessible
 window.checkDeviceTrustStatus = function() {
-    const email = document.getElementById('login-email').value.trim().toLowerCase();
     const sendOtpBtn = document.getElementById('send-otp-btn');
     const directLoginBtn = document.getElementById('direct-login-btn');
     const otpSection = document.getElementById('otp-entry-section');
 
-    if (!email) {
-        if (sendOtpBtn) sendOtpBtn.style.setProperty('display', 'block', 'important');
-        if (directLoginBtn) directLoginBtn.style.setProperty('display', 'none', 'important');
-        return;
-    }
-
-    const safeKey = email.replace(/[^a-zA-Z0-9]/g, "_");
-    const isTrusted = localStorage.getItem('trusted_device_' + safeKey);
-
-    if (isTrusted === 'true') {
-        if (sendOtpBtn) sendOtpBtn.style.setProperty('display', 'none', 'important');
-        if (directLoginBtn) directLoginBtn.style.setProperty('display', 'block', 'important');
-        if (otpSection) otpSection.style.setProperty('display', 'none', 'important');
-    } else {
-        if (sendOtpBtn) sendOtpBtn.style.setProperty('display', 'block', 'important');
-        if (directLoginBtn) directLoginBtn.style.setProperty('display', 'none', 'important');
-    }
+    if (sendOtpBtn) sendOtpBtn.style.setProperty('display', 'none', 'important');
+    if (directLoginBtn) directLoginBtn.style.setProperty('display', 'block', 'important');
+    if (otpSection) otpSection.style.setProperty('display', 'none', 'important');
 };
 
-// DIRECT SECURE PASSWORD LOGIN - CRITICAL FIX FOR LOGOUT/INCORRECT LOOP
+// SECURE PASSWORD LOGIN
 window.handleDirectDeviceLogin = function() {
     const email = document.getElementById('login-email').value.trim().toLowerCase();
     const password = document.getElementById('login-password').value.trim();
@@ -150,27 +136,25 @@ window.handleDirectDeviceLogin = function() {
     if (!email || !password) { alert("Email aur Password dono daalein!"); return; }
 
     statusMsg.style.color = "#f59e0b";
-    statusMsg.innerText = "Authenticating trusted session...";
+    statusMsg.innerText = "Checking credentials...";
 
     const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
-    const currentDeviceCode = getDeviceFingerprint();
 
     fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`)
     .then(res => res.json())
     .then(data => {
-        if (data === null || String(data.password).trim() !== String(password).trim()) {
+        if (data === null) {
             statusMsg.style.color = "#ef4444";
-            statusMsg.innerText = "Access Denied: Incorrect Password!";
+            statusMsg.innerText = "Error: Is Email se koi account nahi mila!";
             return;
         }
 
-        let currentDevices = Array.isArray(data.devices) ? data.devices.filter(Boolean) : [];
+        const savedPassword = String(data.password).trim();
+        const inputPassword = String(password).trim();
 
-        if (!currentDevices.includes(currentDeviceCode)) {
+        if (savedPassword !== inputPassword) {
             statusMsg.style.color = "#ef4444";
-            statusMsg.innerText = "Access Blocked: New Device Detected! Please reverify via OTP.";
-            localStorage.removeItem('trusted_device_' + safeEmailKey);
-            window.checkDeviceTrustStatus();
+            statusMsg.innerText = "Access Denied: Galat Password! Dubara check karein.";
             return;
         }
 
@@ -184,93 +168,6 @@ window.handleDirectDeviceLogin = function() {
         statusMsg.style.color = "#ef4444";
         statusMsg.innerText = "Database connection failed.";
     });
-};
-
-// ORIGINAL OTP REQUEST FOR NEW/UNVERIFIED DEVICES
-window.requestLoginOTP = function() {
-    const email = document.getElementById('login-email').value.trim().toLowerCase();
-    const password = document.getElementById('login-password').value.trim();
-    const statusMsg = document.getElementById('auth-status-msg');
-    
-    if (!email || !password) { alert("Email aur Password dono bharna zaroori hai."); return; }
-
-    statusMsg.style.color = "#f59e0b";
-    statusMsg.innerText = "Verifying credentials...";
-
-    const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
-    const currentDeviceCode = getDeviceFingerprint();
-
-    fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`)
-    .then(response => response.json())
-    .then(data => {
-        if (data === null || String(data.password).trim() !== String(password).trim()) {
-            statusMsg.style.color = "#ef4444";
-            statusMsg.innerText = "Access Denied: Invalid Credentials!";
-            return;
-        }
-
-        let currentDevices = Array.isArray(data.devices) ? data.devices.filter(Boolean) : [];
-
-        if (!currentDevices.includes(currentDeviceCode)) {
-            if (currentDevices.length >= 2) {
-                currentDevices[1] = currentDeviceCode; 
-            } else {
-                currentDevices.push(currentDeviceCode);
-            }
-            localOTPSession.deviceToWhitelist = currentDeviceCode;
-            localOTPSession.updatedDeviceList = currentDevices;
-        } else {
-            localOTPSession.deviceToWhitelist = null;
-            localOTPSession.updatedDeviceList = currentDevices;
-        }
-
-        localOTPSession.registeredName = data.name || email.split('@')[0];
-        const realOTP = Math.floor(100000 + Math.random() * 900000);
-        localOTPSession.generatedOTP = String(realOTP);
-        localOTPSession.targetEmail = email;
-
-        emailjs.send("service_f7w012p", "template_mpcvwoa", {
-            to_email: email,
-            otp_code: realOTP
-        })
-        .then(() => {
-            statusMsg.style.color = "#10b981";
-            statusMsg.innerText = "OTP sent successfully to your email!";
-            document.getElementById('send-otp-btn').style.setProperty('display', 'none', 'important');
-            document.getElementById('otp-entry-section').style.setProperty('display', 'block', 'important');
-        })
-        .catch(() => {
-            statusMsg.style.color = "#ef4444";
-            statusMsg.innerText = "Email delivery failed.";
-        });
-    });
-};
-
-window.verifyLoginOTP = function() {
-    const email = document.getElementById('login-email').value.trim().toLowerCase();
-    const otp = document.getElementById('login-otp').value.trim();
-    const statusMsg = document.getElementById('auth-status-msg');
-    const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
-
-    if (!otp) { alert("Kripya OTP code enter karein."); return; }
-
-    if (email === localOTPSession.targetEmail && otp === localOTPSession.generatedOTP) {
-        fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init/devices.json`, {
-            method: 'PUT',
-            body: JSON.stringify(localOTPSession.updatedDeviceList)
-        })
-        .then(() => {
-            localStorage.setItem('active_session_username', email);
-            localStorage.setItem('registered_full_name_' + safeEmailKey, localOTPSession.registeredName);
-            localStorage.setItem('trusted_device_' + safeEmailKey, 'true'); 
-            statusMsg.style.color = "#10b981";
-            statusMsg.innerText = "Login successful!";
-            forceOpenDashboard();
-        });
-    } else {
-        statusMsg.style.color = "#ef4444";
-        statusMsg.innerText = "Galat OTP code!";
-    }
 };
 
 window.handleRealRegistration = function(event) {
@@ -307,99 +204,8 @@ window.handleRealRegistration = function(event) {
         .then(() => {
             toggleAuthScreens('login');
             localStorage.setItem('registered_full_name_' + safeEmailKey, username);
-            localStorage.setItem('trusted_device_' + safeEmailKey, 'true'); 
-            const statusMsg = document.getElementById('auth-status-msg');
-            if (statusMsg) {
-                statusMsg.style.color = "#10b981";
-                statusMsg.innerText = "Account Successfully Created!";
-            }
+            alert("🎉 Account successfully ban gaya hai! Ab aap direct login kar sakte hain.");
         });
-    });
-};
-
-// RECOVERY OTP REQUEST
-window.requestRecoveryOTP = function() {
-    const email = document.getElementById('forgot-email').value.trim().toLowerCase();
-    const statusMsg = document.getElementById('recovery-status-msg');
-    
-    if (!email) { alert("Kripya pehle apni Registered Email daalein!"); return; }
-
-    statusMsg.style.color = "#f59e0b";
-    statusMsg.innerText = "Checking email registration...";
-
-    const safeEmailKey = email.replace(/[^a-zA-Z0-9]/g, "_");
-
-    fetch(`${FIREBASE_DB_URL}records/${safeEmailKey}/init.json`)
-    .then(res => res.json())
-    .then(cloudData => {
-        if (cloudData !== null && (cloudData.registered === true || cloudData.registered === "true")) {
-            const recoveryOTP = Math.floor(100000 + Math.random() * 900000);
-            recoveryOTPSession.generatedOTP = String(recoveryOTP);
-            recoveryOTPSession.targetEmail = email;
-            recoveryOTPSession.databaseUsername = cloudData.name ? cloudData.name : email.split('@')[0];
-
-            emailjs.send("service_f7w012p", "template_mpcvwoa", {
-                to_email: email,
-                otp_code: recoveryOTP
-            })
-            .then(() => {
-                statusMsg.style.color = "#10b981";
-                statusMsg.innerText = "OTP sent to your recovery email address!";
-                document.getElementById('recovery-step-otp').style.display = 'block';
-            })
-            .catch(() => {
-                statusMsg.style.color = "#ef4444";
-                statusMsg.innerText = "Failed to send recovery OTP.";
-            });
-        } else {
-            statusMsg.style.color = "#ef4444";
-            statusMsg.innerText = "This email is not registered anywhere!";
-        }
-    })
-    .catch(() => {
-        statusMsg.style.color = "#ef4444";
-        statusMsg.innerText = "Connection failed.";
-    });
-};
-
-window.verifyRecoveryOTP = function() {
-    const inputOtp = document.getElementById('forgot-otp').value.trim();
-    const statusMsg = document.getElementById('recovery-status-msg');
-
-    if (!inputOtp) { alert("Kripya OTP enter karein."); return; }
-
-    if (inputOtp === recoveryOTPSession.generatedOTP) {
-        statusMsg.style.color = "#10b981";
-        statusMsg.innerText = "OTP Verified! Now choose a strong new password.";
-        document.getElementById('recovered-username').innerText = recoveryOTPSession.databaseUsername;
-        document.getElementById('recovery-step-fields').style.display = 'block';
-    } else {
-        statusMsg.style.color = "#ef4444";
-        statusMsg.innerText = "Incorrect OTP code.";
-    }
-};
-
-window.handleRecoverySubmit = function(event) {
-    event.preventDefault();
-    const email = recoveryOTPSession.targetEmail;
-    const newPass = document.getElementById('forgot-new-pass').value.trim();
-    const statusMsg = document.getElementById('recovery-status-msg');
-
-    if (!newPass) { alert("New Password bharna mandatory hai!"); return; }
-
-    const safeKey = email.replace(/[^a-zA-Z0-9]/g, "_");
-    
-    fetch(`${FIREBASE_DB_URL}records/${safeKey}/init.json`, {
-        method: 'PATCH',
-        body: JSON.stringify({ password: newPass, registered: true })
-    })
-    .then(() => {
-        toggleAuthScreens('login');
-        alert("🔐 Success: Aapka password successfully reset ho gaya hai!");
-    })
-    .catch(() => {
-        statusMsg.style.color = "#ef4444";
-        statusMsg.innerText = "Error: Database update failed.";
     });
 };
 
@@ -453,8 +259,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const emailField = document.getElementById('login-email');
     if(emailField) { 
         emailField.addEventListener('input', window.checkDeviceTrustStatus);
-        emailField.addEventListener('keyup', window.checkDeviceTrustStatus);
-        emailField.addEventListener('change', window.checkDeviceTrustStatus);
         emailField.addEventListener('focus', window.checkDeviceTrustStatus);
     }
 
@@ -486,7 +290,6 @@ document.addEventListener('click', () => {
     }
 });
 
-// PREMIUM WALL REMOVED COMPLETELY - OPENS HISTORY DIRECTLY FOR ALL USERS
 function openHistoryModal() {
     if (dropdownContainer) { dropdownContainer.style.display = 'none'; }
     if (historyOverlay) historyOverlay.style.display = 'flex';
@@ -600,7 +403,10 @@ function render() {
         document.getElementById('kpi-sub-base-salary').innerText = `Base Salary: ₹${bSalary} | Overtime: +₹${totalOvertime}`;
     }
     
+    // FETCH AND SORT RECORDS - LATEST DATE ON TOP (FIXED DESCENDING SORT)
     const allFilteredRecords = records.filter(item => item && item.date && item.date.substring(0, 7) === activeViewMonthKey);
+    allFilteredRecords.sort((a, b) => b.date.localeCompare(a.date)); // Nayi tarikh sabse upar laane ke liye sorting badli
+
     const hasAnyAbsentReason = allFilteredRecords.some(item => item.status === 'Absent' && item.reason && item.reason.trim() !== "");
 
     let tableHeaderHtml = `<thead><tr><th>Date</th><th>Status</th>${hasAnyAbsentReason ? `<th>Reason</th>` : ''}<th>Borrowing</th><th>Overtime</th><th>Action</th></tr></thead><tbody>`;
